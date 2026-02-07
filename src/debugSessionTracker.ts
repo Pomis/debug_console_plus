@@ -163,6 +163,18 @@ export class DebugSessionTracker implements vscode.Disposable {
   }
 
   /**
+   * Load logs from an external source (e.g., file)
+   */
+  public loadLogs(logs: ParsedLog[]) {
+    this.logs = logs;
+    if (this.onLogCallback) {
+      this.onLogCallback([...this.logs]);
+    }
+    // Write to file so MCP server can access loaded logs
+    this.writeLogsToFile();
+  }
+
+  /**
    * Get current session ID
    */
   public getCurrentSessionId(): string | null {

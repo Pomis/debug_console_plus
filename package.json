@@ -68,6 +68,16 @@
           "command": "debugConsolePlus.setupMcp",
           "when": "view == debugConsolePlusView",
           "group": "navigation@6"
+        },
+        {
+          "command": "debugConsolePlus.saveLogs",
+          "when": "view == debugConsolePlusView",
+          "group": "navigation@7"
+        },
+        {
+          "command": "debugConsolePlus.loadLogs",
+          "when": "view == debugConsolePlusView",
+          "group": "navigation@8"
         }
       ]
     },
@@ -114,6 +124,18 @@
         "command": "debugConsolePlus.setupMcp",
         "title": "Set Up MCP Server",
         "icon": "$(plug)",
+        "category": "Debug Console+"
+      },
+      {
+        "command": "debugConsolePlus.saveLogs",
+        "title": "Save Logs",
+        "icon": "$(save)",
+        "category": "Debug Console+"
+      },
+      {
+        "command": "debugConsolePlus.loadLogs",
+        "title": "Load Logs",
+        "icon": "$(folder-opened)",
         "category": "Debug Console+"
       }
     ],

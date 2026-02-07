@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { DebugConsolePlusViewProvider } from './webviewPanel';
 import { DebugSessionTracker } from './debugSessionTracker';
+import { ParsedLog } from './types';
 
 let tracker: DebugSessionTracker | null = null;
 let viewProvider: DebugConsolePlusViewProvider | null = null;
@@ -197,7 +198,107 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  context.subscriptions.push(focusCommand, clearCommand, toggleTimestampsCommand, copyAllCommand, toggleNormalizeCommand, toggleTagsCommand, diagnoseCommand, setupMcpCommand, tracker);
+  const saveLogsCommand = vscode.commands.registerCommand('debugConsolePlus.saveLogs', async () => {
+    if (!tracker) {
+      vscode.window.showErrorMessage('Debug Console+ tracker is not available.');
+      return;
+    }
+
+    const logs = tracker.getLogs();
+    if (logs.length === 0) {
+      vscode.window.showInformationMessage('No logs to save.');
+      return;
+    }
+
+    const fileUri = await vscode.window.showSaveDialog({
+      filters: {
+        'JSON': ['json']
+      },
+      defaultUri: vscode.Uri.file('debug-logs.json'),
+      saveLabel: 'Save Logs'
+    });
+
+    if (!fileUri) {
+      return; // User cancelled
+    }
+
+    try {
+      const jsonContent = JSON.stringify(logs, null, 2);
+      await vscode.workspace.fs.writeFile(fileUri, Buffer.from(jsonContent, 'utf8'));
+      vscode.window.showInformationMessage(`Saved ${logs.length} log${logs.length === 1 ? '' : 's'} to ${path.basename(fileUri.fsPath)}`);
+    } catch (error) {
+      vscode.window.showErrorMessage(`Failed to save logs: ${error}`);
+    }
+  });
+
+  const loadLogsCommand = vscode.commands.registerCommand('debugConsolePlus.loadLogs', async () => {
+    if (!tracker) {
+      vscode.window.showErrorMessage('Debug Console+ tracker is not available.');
+      return;
+    }
+
+    const fileUris = await vscode.window.showOpenDialog({
+      filters: {
+        'JSON': ['json']
+      },
+      canSelectMany: false,
+      openLabel: 'Load Logs'
+    });
+
+    if (!fileUris || fileUris.length === 0) {
+      return; // User cancelled
+    }
+
+    const fileUri = fileUris[0];
+
+    try {
+      const fileContent = await vscode.workspace.fs.readFile(fileUri);
+      const jsonContent = fileContent.toString();
+      const parsedData = JSON.parse(jsonContent);
+
+      // Validate that it's an array
+      if (!Array.isArray(parsedData)) {
+        vscode.window.showErrorMessage('Invalid log file format: expected an array of log entries.');
+        return;
+      }
+
+      // Validate that each entry has the expected ParsedLog structure
+      const validLogs: ParsedLog[] = [];
+      for (let i = 0; i < parsedData.length; i++) {
+        const entry = parsedData[i];
+        if (
+          typeof entry === 'object' &&
+          entry !== null &&
+          typeof entry.id === 'string' &&
+          typeof entry.timestamp === 'number' &&
+          typeof entry.level === 'string' &&
+          typeof entry.message === 'string' &&
+          typeof entry.category === 'string' &&
+          typeof entry.sessionId === 'string'
+        ) {
+          validLogs.push(entry as ParsedLog);
+        } else {
+          console.warn(`[Debug Console+] Skipping invalid log entry at index ${i}`);
+        }
+      }
+
+      if (validLogs.length === 0) {
+        vscode.window.showErrorMessage('No valid log entries found in the file.');
+        return;
+      }
+
+      tracker.loadLogs(validLogs);
+      vscode.window.showInformationMessage(`Loaded ${validLogs.length} log${validLogs.length === 1 ? '' : 's'} from ${path.basename(fileUri.fsPath)}`);
+    } catch (error) {
+      if (error instanceof SyntaxError) {
+        vscode.window.showErrorMessage(`Failed to parse JSON file: ${error.message}`);
+      } else {
+        vscode.window.showErrorMessage(`Failed to load logs: ${error}`);
+      }
+    }
+  });
+
+  context.subscriptions.push(focusCommand, clearCommand, toggleTimestampsCommand, copyAllCommand, toggleNormalizeCommand, toggleTagsCommand, diagnoseCommand, setupMcpCommand, saveLogsCommand, loadLogsCommand, tracker);
 
   // Auto-show view when debug session starts
   vscode.debug.onDidStartDebugSession(() => {
