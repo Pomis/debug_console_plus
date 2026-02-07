@@ -1,0 +1,169 @@
+{
+  "name": "debug-console-plus",
+  "displayName": "Debug Console+",
+  "description": "A better debug console with filtering, search, and MCP integration",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Debuggers"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "debugConsolePlusContainer",
+          "title": "Debug Console+",
+          "icon": "$(debug-console)"
+        }
+      ]
+    },
+    "views": {
+      "debugConsolePlusContainer": [
+        {
+          "id": "debugConsolePlusView",
+          "name": "Debug Console+",
+          "type": "webview"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "debugConsolePlus.toggleTags",
+          "when": "view == debugConsolePlusView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "debugConsolePlus.toggleNormalize",
+          "when": "view == debugConsolePlusView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "debugConsolePlus.toggleTimestamps",
+          "when": "view == debugConsolePlusView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "debugConsolePlus.copyAll",
+          "when": "view == debugConsolePlusView",
+          "group": "navigation@4"
+        },
+        {
+          "command": "debugConsolePlus.clear",
+          "when": "view == debugConsolePlusView",
+          "group": "navigation@5"
+        },
+        {
+          "command": "debugConsolePlus.setupMcp",
+          "when": "view == debugConsolePlusView",
+          "group": "navigation@6"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "debugConsolePlus.toggleTags",
+        "title": "Toggle [TAG] highlighting",
+        "icon": "$(bracket)",
+        "category": "Debug Console+"
+      },
+      {
+        "command": "debugConsolePlus.toggleNormalize",
+        "title": "Normalize (remove [tag] | timestamp |)",
+        "icon": "$(fold)",
+        "category": "Debug Console+"
+      },
+      {
+        "command": "debugConsolePlus.clear",
+        "title": "Clear Logs",
+        "icon": "$(clear-all)",
+        "category": "Debug Console+"
+      },
+      {
+        "command": "debugConsolePlus.copyAll",
+        "title": "Copy All Logs",
+        "icon": "$(copy)",
+        "category": "Debug Console+"
+      },
+      {
+        "command": "debugConsolePlus.toggleTimestamps",
+        "title": "Toggle Timestamps",
+        "icon": "$(watch)",
+        "category": "Debug Console+"
+      },
+      {
+        "command": "debugConsolePlus.focus",
+        "title": "Focus Debug Console+"
+      },
+      {
+        "command": "debugConsolePlus.diagnose",
+        "title": "Diagnose Extension"
+      },
+      {
+        "command": "debugConsolePlus.setupMcp",
+        "title": "Set Up MCP Server",
+        "icon": "$(plug)",
+        "category": "Debug Console+"
+      }
+    ],
+    "configuration": {
+      "title": "Debug Console+",
+      "properties": {
+        "debugConsolePlus.defaultLevels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "debug",
+              "info",
+              "warn",
+              "error"
+            ]
+          },
+          "default": [
+            "info",
+            "warn",
+            "error"
+          ],
+          "description": "Log levels shown by default"
+        },
+        "debugConsolePlus.maxLogs": {
+          "type": "number",
+          "default": 10000,
+          "description": "Maximum logs per session"
+        },
+        "debugConsolePlus.showTimestamps": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show timestamps by default"
+        },
+        "debugConsolePlus.autoHideTimestampsWidth": {
+          "type": "number",
+          "default": 200,
+          "description": "Auto-hide timestamps when panel width is below this (in pixels)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.74.0",
+    "esbuild": "^0.19.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0"
+  }
+}

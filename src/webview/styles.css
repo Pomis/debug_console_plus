@@ -1,0 +1,337 @@
+:root {
+  --vscode-font-family: var(--vscode-font-family);
+  --vscode-font-size: var(--vscode-font-size);
+  --vscode-foreground: var(--vscode-foreground);
+  --vscode-background: var(--vscode-editor-background);
+  --vscode-button-background: var(--vscode-button-background);
+  --vscode-button-foreground: var(--vscode-button-foreground);
+  --vscode-button-hoverBackground: var(--vscode-button-hoverBackground);
+  --vscode-input-background: var(--vscode-input-background);
+  --vscode-input-foreground: var(--vscode-input-foreground);
+  --vscode-input-border: var(--vscode-input-border);
+  --vscode-scrollbarSlider-background: var(--vscode-scrollbarSlider-background);
+  --vscode-scrollbarSlider-hoverBackground: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-background);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Minimal toolbar with just level toggles */
+.toolbar {
+  display: flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-bottom: 1px solid var(--vscode-input-border);
+  flex-shrink: 0;
+  gap: 8px;
+  background-color: var(--vscode-editor-background);
+}
+
+.level-filters {
+  display: flex;
+  gap: 2px;
+}
+
+.level-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background-color: transparent;
+  color: var(--vscode-descriptionForeground, #888);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--vscode-editor-font-family, monospace);
+  transition: all 0.15s;
+  opacity: 0.5;
+}
+
+.level-btn:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+  border-color: var(--vscode-input-border);
+  opacity: 0.8;
+}
+
+.level-btn.active {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  opacity: 1;
+}
+
+.level-btn[data-level="warn"].active {
+  background-color: var(--vscode-editorWarning-foreground, #cca700);
+  color: #000;
+}
+
+.level-btn[data-level="error"].active {
+  background-color: var(--vscode-editorError-foreground, #f48771);
+  color: #000;
+}
+
+/* Logic toggle button */
+.logic-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background-color: transparent;
+  color: var(--vscode-descriptionForeground, #888);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--vscode-editor-font-family, monospace);
+  transition: all 0.15s;
+  opacity: 0.5;
+}
+
+.logic-toggle:hover {
+  background-color: var(--vscode-button-secondaryHoverBackground);
+  border-color: var(--vscode-input-border);
+  opacity: 0.8;
+}
+
+.logic-toggle.active {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  opacity: 1;
+}
+
+.logic-toggle:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.logic-toggle:disabled:hover {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+/* Filter input */
+.filter-input {
+  flex: 1;
+  min-width: 80px;
+  max-width: 300px;
+  padding: 2px 6px;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border);
+  border-radius: 3px;
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.filter-input:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.filter-input::placeholder {
+  color: var(--vscode-input-placeholderForeground, #888);
+}
+
+/* Logs container */
+.logs-container {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 8px;
+  font-family: var(--vscode-editor-font-family, 'Courier New', monospace);
+  font-size: var(--vscode-editor-font-size, 12px);
+  font-weight: var(--vscode-editor-font-weight, normal);
+  line-height: 1.2;
+}
+
+.log-entry {
+  display: flex;
+  gap: 8px;
+  padding: 2px 4px;
+  word-break: break-word;
+  white-space: pre-wrap;
+  align-items: flex-start;
+  transition: background-color 0.3s ease-out;
+  min-height: 18px;
+}
+
+.log-entry.highlight {
+  background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+}
+
+.log-entry.hover-highlight {
+  outline: 2px solid var(--vscode-focusBorder, #007acc);
+  outline-offset: -2px;
+  background-color: var(--vscode-list-hoverBackground, rgba(255, 255, 255, 0.1));
+}
+
+/* Virtual scroll container */
+.virtual-scroll-content {
+  width: 100%;
+}
+
+.virtual-visible-content {
+  width: 100%;
+}
+
+/* Hidden measure container */
+.measure-container {
+  pointer-events: none;
+}
+
+.log-entry.hidden {
+  display: none;
+}
+
+.log-entry.debug {
+  opacity: 0.7;
+}
+
+.log-entry.info {
+  opacity: 0.9;
+}
+
+.log-entry.warn {
+  color: var(--vscode-editorWarning-foreground, #ffa500);
+}
+
+.log-entry.error {
+  color: var(--vscode-editorError-foreground, #f48771);
+}
+
+.log-timestamp {
+  flex-shrink: 0;
+  color: var(--vscode-descriptionForeground, #999);
+  font-size: 0.9em;
+  white-space: nowrap;
+}
+
+.log-level {
+  flex-shrink: 0;
+  font-weight: 600;
+  font-size: 0.9em;
+  min-width: 40px;
+  text-align: right;
+}
+
+.log-message {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Hide timestamps when showTimestamps is false */
+.hide-timestamps .log-timestamp,
+.hide-timestamps .log-level {
+  display: none;
+}
+
+.hide-timestamps .log-entry {
+  gap: 4px;
+}
+
+/* Responsive: Hide timestamps when width < 200px */
+.hide-timestamps-responsive .log-timestamp,
+.hide-timestamps-responsive .log-level {
+  display: none;
+}
+
+.hide-timestamps-responsive .log-entry {
+  gap: 4px;
+}
+
+/* Scrollbar styling */
+.logs-container::-webkit-scrollbar {
+  width: 10px;
+}
+
+.logs-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.logs-container::-webkit-scrollbar-thumb {
+  background-color: var(--vscode-scrollbarSlider-background);
+  border-radius: 5px;
+}
+
+.logs-container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--vscode-scrollbarSlider-hoverBackground);
+}
+
+/* Clickable file links */
+.file-link {
+  color: var(--vscode-textLink-foreground, #3794ff);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.file-link:hover {
+  color: var(--vscode-textLink-activeForeground, #3794ff);
+  text-decoration: underline;
+}
+
+/* Search highlight */
+.search-highlight {
+  background-color: var(--vscode-editor-findMatchHighlightBackground, rgba(234, 92, 0, 0.33));
+  border-radius: 2px;
+}
+
+/* Tag highlight [TAG] */
+.log-tag {
+  color: var(--vscode-symbolIcon-classForeground, var(--vscode-textLink-foreground, #4ec9b0));
+  font-weight: 600;
+}
+
+/* Context menu */
+.context-menu {
+  position: fixed;
+  background-color: var(--vscode-menu-background, #252526);
+  border: 1px solid var(--vscode-menu-border, #454545);
+  border-radius: 4px;
+  padding: 4px 0;
+  min-width: 180px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+}
+
+.context-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 12px;
+  background: none;
+  border: none;
+  color: var(--vscode-menu-foreground, #cccccc);
+  font-size: var(--vscode-font-size, 13px);
+  text-align: left;
+  cursor: pointer;
+}
+
+.context-menu-item:hover {
+  background-color: var(--vscode-menu-selectionBackground, #094771);
+  color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+
+.context-menu-separator {
+  height: 1px;
+  background-color: var(--vscode-menu-separatorBackground, #454545);
+  margin: 4px 8px;
+}
