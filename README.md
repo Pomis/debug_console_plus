@@ -31,7 +31,11 @@ npm install
 npm run compile
 ```
 
-Press `F5` to launch the Extension Development Host, or `npm run package` to build a `.vsix`.
+## Build
+
+```bash
+npx --yes @vscode/vsce package
+```
 
 ## License
 

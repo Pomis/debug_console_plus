@@ -1,8 +1,13 @@
 {
   "name": "debug-console-plus",
   "displayName": "Debug Console+",
+  "publisher": "Pomisoft",
   "description": "A better debug console with filtering, search, and MCP integration",
   "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Pomis/debug_console_plus.git"
+  },
   "engines": {
     "vscode": "^1.74.0"
   },
