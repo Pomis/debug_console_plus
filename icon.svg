@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <!-- Clip path for lens highlight effect -->
+    <clipPath id="lensClip">
+      <circle cx="74" cy="64" r="25"/>
+    </clipPath>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect x="4" y="4" width="120" height="120" rx="24" ry="24" fill="#1e1e1e"/>
+
+  <!-- Log lines (base layer, muted) -->
+  <!-- Line 1: debug (teal) -->
+  <rect x="20" y="26" width="4" height="10" rx="2" fill="#5f9ea0"/>
+  <rect x="28" y="28" width="48" height="6" rx="3" fill="#333333"/>
+
+  <!-- Line 2: info (green) -->
+  <rect x="20" y="42" width="4" height="10" rx="2" fill="#66bb6a"/>
+  <rect x="28" y="44" width="60" height="6" rx="3" fill="#333333"/>
+
+  <!-- Line 3: warn (amber) -->
+  <rect x="20" y="58" width="4" height="10" rx="2" fill="#ffa726"/>
+  <rect x="28" y="60" width="42" height="6" rx="3" fill="#333333"/>
+
+  <!-- Line 4: error (red) -->
+  <rect x="20" y="74" width="4" height="10" rx="2" fill="#ef5350"/>
+  <rect x="28" y="76" width="54" height="6" rx="3" fill="#333333"/>
+
+  <!-- Line 5: info (green) -->
+  <rect x="20" y="90" width="4" height="10" rx="2" fill="#66bb6a"/>
+  <rect x="28" y="92" width="36" height="6" rx="3" fill="#333333"/>
+
+  <!-- Magnifying glass -->
+  <!-- Lens interior (subtle tint, single fill) -->
+  <circle cx="74" cy="64" r="27" fill="#2a2a2a" fill-opacity="0.85"/>
+
+  <!-- Highlighted log lines through the lens (brighter, enhanced) -->
+  <g clip-path="url(#lensClip)">
+    <!-- Enhanced line 2: info -->
+    <rect x="20" y="42" width="4" height="10" rx="2" fill="#81c784"/>
+    <rect x="28" y="44" width="60" height="6" rx="3" fill="#444444"/>
+
+    <!-- Enhanced line 3: warn -->
+    <rect x="20" y="58" width="4" height="10" rx="2" fill="#ffcc02"/>
+    <rect x="28" y="60" width="42" height="6" rx="3" fill="#444444"/>
+
+    <!-- Enhanced line 4: error -->
+    <rect x="20" y="74" width="4" height="10" rx="2" fill="#ff5252"/>
+    <rect x="28" y="76" width="54" height="6" rx="3" fill="#444444"/>
+  </g>
+
+  <!-- Lens ring (single solid color, no gradient) -->
+  <circle cx="74" cy="64" r="27" fill="none" stroke="#cccccc" stroke-width="3"/>
+
+  <!-- Handle -->
+  <line x1="93" y1="84" x2="105" y2="96" stroke="#cccccc" stroke-width="3" stroke-linecap="round"/>
+</svg>
