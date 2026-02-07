@@ -68,7 +68,7 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
             break;
           case 'openFile':
             if (message.filePath) {
-              await this.openFileAtLocation(message.filePath, message.line, message.column);
+              await this.openFileAtLocation(message.filePath, message.line, message.column, message.scheme);
             }
             break;
         }
@@ -149,10 +149,10 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
     this.sendConfig();
   }
 
-  public toggleNormalize() {
+  public toggleCompact() {
     if (this._view) {
       this._view.webview.postMessage({
-        type: 'toggleNormalize',
+        type: 'toggleCompact',
       });
     }
   }
@@ -171,26 +171,80 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
     }
   }
 
-  private async openFileAtLocation(filePath: string, line?: number, column?: number) {
+  private async tryStatUri(uri: vscode.Uri): Promise<boolean> {
     try {
-      // Try to find the file in workspace folders
+      await vscode.workspace.fs.stat(uri);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async openFileAtLocation(filePath: string, line?: number, column?: number, scheme?: string) {
+    try {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       let uri: vscode.Uri | undefined;
 
+      // Build a list of candidate paths to try
+      const candidates: string[] = [filePath];
+
+      // For Dart package: paths, the first segment is the package name and the
+      // rest maps to the lib/ directory.  e.g. package:log_example/log_simulators/error_simulator.dart
+      // becomes log_example/log_simulators/error_simulator.dart after prefix
+      // stripping.  The actual file lives at lib/log_simulators/error_simulator.dart.
+      if (scheme === 'package' && filePath.includes('/')) {
+        const segments = filePath.split('/');
+        const withoutPackageName = segments.slice(1).join('/');
+        candidates.push(`lib/${withoutPackageName}`);
+      }
+
+      // Try each candidate path in every workspace folder
       if (workspaceFolders) {
-        for (const folder of workspaceFolders) {
-          const fullPath = vscode.Uri.joinPath(folder.uri, filePath);
-          try {
-            await vscode.workspace.fs.stat(fullPath);
-            uri = fullPath;
-            break;
-          } catch {
-            // File doesn't exist in this folder, try next
+        for (const candidate of candidates) {
+          for (const folder of workspaceFolders) {
+            const fullPath = vscode.Uri.joinPath(folder.uri, candidate);
+            if (await this.tryStatUri(fullPath)) {
+              uri = fullPath;
+              break;
+            }
+          }
+          if (uri) { break; }
+        }
+      }
+
+      // Fallback: search the entire workspace for the filename
+      if (!uri) {
+        const fileName = filePath.split(/[/\\]/).pop();
+        if (fileName) {
+          const found = await vscode.workspace.findFiles(`**/${fileName}`, '**/build/**', 5);
+          if (found.length === 1) {
+            uri = found[0];
+          } else if (found.length > 1) {
+            // Prefer the result whose path ends with the most matching segments
+            const pathSegments = filePath.split(/[/\\]/);
+            let bestMatch: vscode.Uri | undefined;
+            let bestScore = 0;
+            for (const f of found) {
+              const fSegments = f.path.split('/');
+              let score = 0;
+              for (let i = 1; i <= Math.min(pathSegments.length, fSegments.length); i++) {
+                if (pathSegments[pathSegments.length - i] === fSegments[fSegments.length - i]) {
+                  score++;
+                } else {
+                  break;
+                }
+              }
+              if (score > bestScore) {
+                bestScore = score;
+                bestMatch = f;
+              }
+            }
+            uri = bestMatch || found[0];
           }
         }
       }
 
-      // If not found in workspace, try as absolute path
+      // If still not found, try as absolute path
       if (!uri) {
         uri = vscode.Uri.file(filePath);
       }
@@ -206,7 +260,7 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
       }
     } catch (error) {
       console.error('[Debug Console+] Failed to open file:', error);
-      vscode.window.showErrorMessage(`Could not open file: ${filePath}`);
+      vscode.window.showErrorMessage(`Could not open file: "${filePath}"`);
     }
   }
 
