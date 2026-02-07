@@ -86,9 +86,9 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  const toggleNormalizeCommand = vscode.commands.registerCommand('debugConsolePlus.toggleNormalize', () => {
+  const toggleCompactCommand = vscode.commands.registerCommand('debugConsolePlus.toggleCompact', () => {
     if (viewProvider) {
-      viewProvider.toggleNormalize();
+      viewProvider.toggleCompact();
     }
   });
 
@@ -298,7 +298,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  context.subscriptions.push(focusCommand, clearCommand, toggleTimestampsCommand, copyAllCommand, toggleNormalizeCommand, toggleTagsCommand, diagnoseCommand, setupMcpCommand, saveLogsCommand, loadLogsCommand, tracker);
+  context.subscriptions.push(focusCommand, clearCommand, toggleTimestampsCommand, copyAllCommand, toggleCompactCommand, toggleTagsCommand, diagnoseCommand, setupMcpCommand, saveLogsCommand, loadLogsCommand, tracker);
 
   // Auto-show view when debug session starts
   vscode.debug.onDidStartDebugSession(() => {

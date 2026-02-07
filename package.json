@@ -45,7 +45,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "debugConsolePlus.toggleNormalize",
+          "command": "debugConsolePlus.toggleCompact",
           "when": "view == debugConsolePlusView",
           "group": "navigation@2"
         },
@@ -89,8 +89,8 @@
         "category": "Debug Console+"
       },
       {
-        "command": "debugConsolePlus.toggleNormalize",
-        "title": "Normalize (remove [tag] | timestamp |)",
+        "command": "debugConsolePlus.toggleCompact",
+        "title": "Compact (strip timestamps, logcat tags, box-drawing)",
         "icon": "$(fold)",
         "category": "Debug Console+"
       },

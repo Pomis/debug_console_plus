@@ -11,7 +11,7 @@
   let autoHideTimestampsWidth = 200;
   let shouldAutoScroll = true;
   let contextMenuTargetIndex = -1;
-  let normalizeMessages = false;
+  let compactMessages = false;
   let highlightTags = true; // true = highlight [TAGS], false = plain text
   let filterLogicAnd = true; // true = AND, false = OR
 
@@ -29,12 +29,15 @@
   let pendingRender = false;
 
   // File path regex (supports package: and dart: URI scheme prefixes)
-  const FILE_PATH_REGEX = /(?:package:|dart:)?([a-zA-Z0-9_\-./\\]+\.(?:dart|kt|java|ts|js|tsx|jsx|py|rb|go|rs|cpp|c|h|hpp|swift|m|mm|json|xml|yaml|yml|gradle|properties|txt|md|html|css|scss|less)):(\d+)(?::(\d+))?/g;
+  const FILE_PATH_REGEX = /(package:|dart:)?([a-zA-Z0-9_\-./\\]+\.(?:dart|kt|java|ts|js|tsx|jsx|py|rb|go|rs|cpp|c|h|hpp|swift|m|mm|json|xml|yaml|yml|gradle|properties|txt|md|html|css|scss|less)):(\d+)(?::(\d+))?/g;
 
-  // Matches both patterns:
-  // Old: [tag] | timestamp ms | message
-  // New: HH:mm:ss.SSS LEVEL message
-  const NORMALIZE_REGEX = /^(?:\[[\w]+\]\s*\|\s*\d{1,2}:\d{2}:\d{2}\s+\d+ms\s*\|\s*|\d{2}:\d{2}:\d{2}\.\d{3}\s+(?:DEBUG|INFO|WARNING|ERROR|WARN)\s+)/;
+  // Matches verbose prefixes to strip:
+  // Old logger: [tag] | timestamp ms | message
+  // New logger: HH:mm:ss.SSS LEVEL message
+  // Android logcat: D/sqflite:  (single letter level / tag name : )
+  const COMPACT_PREFIX_REGEX = /^(?:\[[\w]+\]\s*\|\s*\d{1,2}:\d{2}:\d{2}\s+\d+ms\s*\|\s*|\d{2}:\d{2}:\d{2}\.\d{3}\s+(?:DEBUG|INFO|WARNING|ERROR|WARN)\s+|[DIWEV]\/[\w.]+:\s*)/;
+  // Bracketed timestamps like [2026-02-07 18:06:00.904] (can appear anywhere in the line)
+  const BRACKET_TIMESTAMP_REGEX = /\[\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:\.\d+)?\]\s*/g;
   // Box-drawing characters used by logger packages (e.g. │├└┌┐┘─║╔╗╚╝ etc.)
   const BOX_DRAWING_REGEX = /[│├└┌┐┘┴┬┼─║╔╗╚╝╠╣╦╩╬]+\s*/g;
   const TAG_REGEX = /\[([A-Za-z][\w. =-]*)\]/g;
@@ -301,8 +304,8 @@
       case 'copyAll':
         handleCopyAll();
         break;
-      case 'toggleNormalize':
-        toggleNormalize();
+      case 'toggleCompact':
+        toggleCompact();
         break;
       case 'toggleTags':
         toggleTagHighlighting();
@@ -360,8 +363,8 @@
     applyFilters();
   }
 
-  function toggleNormalize() {
-    normalizeMessages = !normalizeMessages;
+  function toggleCompact() {
+    compactMessages = !compactMessages;
     itemHeights.clear();
     recalculatePositions();
     scheduleRender(true); // Force render on toggle
@@ -372,9 +375,9 @@
     scheduleRender(true); // Force render on toggle
   }
 
-  function normalizeMessage(message) {
-    if (!normalizeMessages) return message;
-    return message.replace(NORMALIZE_REGEX, '').replace(BOX_DRAWING_REGEX, '');
+  function compactMessage(message) {
+    if (!compactMessages) return message;
+    return message.replace(COMPACT_PREFIX_REGEX, '').replace(BRACKET_TIMESTAMP_REGEX, '').replace(BOX_DRAWING_REGEX, '');
   }
 
   function updateSearchRegex() {
@@ -592,10 +595,10 @@
   }
 
   function processMessageForDisplay(text) {
-    let html = highlightSearchMatches(normalizeMessage(text));
+    let html = highlightSearchMatches(compactMessage(text));
     html = applyTagHighlighting(html);
-    return html.replace(FILE_PATH_REGEX, (match, path, line, col) => {
-      return `<span class="file-link" data-path="${escapeHtml(path)}" data-line="${line}" data-col="${col || '1'}">${match}</span>`;
+    return html.replace(FILE_PATH_REGEX, (match, prefix, path, line, col) => {
+      return `<span class="file-link" data-path="${escapeHtml(path)}" data-line="${line}" data-col="${col || '1'}" data-scheme="${prefix ? escapeHtml(prefix.replace(':', '')) : ''}">${match}</span>`;
     });
   }
 
@@ -684,7 +687,8 @@
         type: 'openFile',
         filePath: link.dataset.path,
         line: parseInt(link.dataset.line, 10),
-        column: parseInt(link.dataset.col, 10)
+        column: parseInt(link.dataset.col, 10),
+        scheme: link.dataset.scheme || ''
       });
     }
   }

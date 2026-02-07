@@ -12,7 +12,7 @@ export interface ParsedLog {
 export type TimestampMode = 'absolute' | 'relative' | 'hidden';
 
 export interface WebviewMessage {
-  type: 'logs' | 'clear' | 'config' | 'setFilter' | 'copyAll' | 'toggleNormalize' | 'toggleTags';
+  type: 'logs' | 'clear' | 'config' | 'setFilter' | 'copyAll' | 'toggleCompact' | 'toggleTags';
   logs?: ParsedLog[];
   config?: {
     timestampMode: TimestampMode;
@@ -29,5 +29,6 @@ export interface WebviewToExtensionMessage {
   filePath?: string;
   line?: number;
   column?: number;
+  scheme?: string;
 }
 
