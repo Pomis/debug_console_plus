@@ -394,9 +394,9 @@
   }
 
   function formatRelativeTimestamp(timestamp) {
-    if (launchTimestamp === null) return '+00.000';
+    if (launchTimestamp === null) return '+00:00.000';
     const diffMs = timestamp - launchTimestamp;
-    if (diffMs < 0) return '+00.000';
+    if (diffMs < 0) return '+00:00.000';
 
     const totalSeconds = diffMs / 1000;
     const hours = Math.floor(totalSeconds / 3600);
@@ -407,10 +407,7 @@
     if (hours > 0) {
       return `+${hours}:${String(minutes).padStart(2, '0')}:${secStr.padStart(6, '0')}`;
     }
-    if (minutes > 0) {
-      return `+${minutes}:${secStr.padStart(6, '0')}`;
-    }
-    return `+${secStr.padStart(6, '0')}`;
+    return `+${String(minutes).padStart(2, '0')}:${secStr.padStart(6, '0')}`;
   }
 
   function getTimestampText(log) {
@@ -594,11 +591,192 @@
     });
   }
 
+  // Find end of balanced JSON object/array starting at start (open is '{' or '['). Respects strings.
+  function findBalancedJsonEnd(html, start) {
+    const open = html[start];
+    const close = open === '{' ? '}' : ']';
+    let depth = 1;
+    let i = start + 1;
+    let inString = false;
+    let escape = false;
+    let quote = '"';
+    while (i < html.length) {
+      if (escape) {
+        escape = false;
+        i++;
+        continue;
+      }
+      if (inString) {
+        if (html[i] === '\\') {
+          escape = true;
+          i++;
+          continue;
+        }
+        if (html[i] === quote) {
+          inString = false;
+          i++;
+          continue;
+        }
+        i++;
+        continue;
+      }
+      const c = html[i];
+      if (c === '"' || c === "'") {
+        inString = true;
+        quote = c;
+        i++;
+        continue;
+      }
+      if (c === open) {
+        depth++;
+        i++;
+        continue;
+      }
+      if (c === close) {
+        depth--;
+        if (depth === 0) return i;
+        i++;
+        continue;
+      }
+      i++;
+    }
+    return -1;
+  }
+
+  // Tokenize JSON substring and wrap tokens in spans (depth-based bracket colors, key/string/number/punctuation).
+  // Input jsonStr is already HTML-escaped from the pipeline; output raw to avoid double-encoding.
+  function tokenizeAndHighlightJson(jsonStr) {
+    const DEPTH_COUNT = 6;
+    let out = '';
+    let depth = 0;
+    let i = 0;
+    const len = jsonStr.length;
+
+    while (i < len) {
+      const c = jsonStr[i];
+
+      if (c === '{' || c === '[') {
+        const depthClass = depth % DEPTH_COUNT;
+        out += `<span class="json-bracket json-depth-${depthClass}">${c}</span>`;
+        depth++;
+        i++;
+        continue;
+      }
+
+      if (c === '}' || c === ']') {
+        depth--;
+        const depthClass = Math.max(0, depth) % DEPTH_COUNT;
+        out += `<span class="json-bracket json-depth-${depthClass}">${c}</span>`;
+        i++;
+        continue;
+      }
+
+      if (c === ':') {
+        out += `<span class="json-punctuation">${c}</span>`;
+        i++;
+        continue;
+      }
+
+      if (c === ',') {
+        out += `<span class="json-punctuation">${c}</span>`;
+        i++;
+        continue;
+      }
+
+      if (c === '"' || c === "'") {
+        const quote = c;
+        let start = i;
+        i++;
+        while (i < len) {
+          if (jsonStr[i] === '\\') {
+            i += 2;
+            continue;
+          }
+          if (jsonStr[i] === quote) {
+            i++;
+            break;
+          }
+          i++;
+        }
+        const raw = jsonStr.slice(start, i);
+        const isKey = (() => {
+          let j = start - 1;
+          while (j >= 0 && /[\s]/.test(jsonStr[j])) j--;
+          return j >= 0 && (jsonStr[j] === '{' || jsonStr[j] === ',');
+        })();
+        const cls = isKey ? 'json-key' : 'json-string';
+        out += `<span class="${cls}">${raw}</span>`;
+        continue;
+      }
+
+      if (/[\s]/.test(c)) {
+        out += c;
+        i++;
+        continue;
+      }
+
+      if (/[-0-9]/.test(c) || (c === 't' && jsonStr.slice(i, i + 4) === 'true') || (c === 'f' && jsonStr.slice(i, i + 5) === 'false') || (c === 'n' && jsonStr.slice(i, i + 4) === 'null')) {
+        let start = i;
+        if (jsonStr.slice(i, i + 4) === 'true') i += 4;
+        else if (jsonStr.slice(i, i + 5) === 'false') i += 5;
+        else if (jsonStr.slice(i, i + 4) === 'null') i += 4;
+        else {
+          if (jsonStr[i] === '-') i++;
+          while (i < len && /[0-9.eE+-]/.test(jsonStr[i])) i++;
+        }
+        out += `<span class="json-number">${jsonStr.slice(start, i)}</span>`;
+        continue;
+      }
+
+      out += c;
+      i++;
+    }
+    return out;
+  }
+
+  function applyJsonHighlighting(html) {
+    if (!highlightTags) return html;
+    let result = '';
+    let i = 0;
+    const len = html.length;
+
+    while (i < len) {
+      if (html[i] === '<') {
+        const close = html.indexOf('>', i);
+        if (close === -1) {
+          result += html[i];
+          i++;
+          continue;
+        }
+        result += html.slice(i, close + 1);
+        i = close + 1;
+        continue;
+      }
+
+      if (html[i] === '{' || html[i] === '[') {
+        const end = findBalancedJsonEnd(html, i);
+        if (end !== -1 && end > i + 1) {
+          const chunk = html.slice(i, end + 1);
+          result += tokenizeAndHighlightJson(chunk);
+          i = end + 1;
+          continue;
+        }
+      }
+
+      result += html[i];
+      i++;
+    }
+    return result;
+  }
+
   function processMessageForDisplay(text) {
     let html = highlightSearchMatches(compactMessage(text));
     html = applyTagHighlighting(html);
+    html = applyJsonHighlighting(html);
+    // File links: data-scheme is "package" or "dart" (no colon); data-path is the path after the scheme (e.g. log_example/.../file.dart)
     return html.replace(FILE_PATH_REGEX, (match, prefix, path, line, col) => {
-      return `<span class="file-link" data-path="${escapeHtml(path)}" data-line="${line}" data-col="${col || '1'}" data-scheme="${prefix ? escapeHtml(prefix.replace(':', '')) : ''}">${match}</span>`;
+      const scheme = prefix ? prefix.replace(':', '') : '';
+      return `<span class="file-link" data-path="${escapeHtml(path)}" data-line="${line}" data-col="${col || '1'}" data-scheme="${escapeHtml(scheme)}">${match}</span>`;
     });
   }
 
@@ -683,6 +861,7 @@
     if (link) {
       e.preventDefault();
       e.stopPropagation();
+      // Extension expects: filePath (path only), line/column numbers, scheme '' or 'package'/'dart'
       vscode.postMessage({
         type: 'openFile',
         filePath: link.dataset.path,
