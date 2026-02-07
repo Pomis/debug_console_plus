@@ -8,7 +8,7 @@ A better debug console for VS Code / Cursor. Filter, search, and let AI query yo
 - **Smart parsing** — detects `[debug]`, `[error]`, etc. tags in log messages automatically
 - **Search** — filter logs by text or regex, combine with AND/OR logic
 - **Timestamps** — show/hide, auto-hides on narrow panels
-- **Normalize** — strip tags and timestamps for clean output
+- **Compact** — strip timestamps, Android logcat tags, and box-drawing for clean output
 - **Copy all** — copies filtered logs to clipboard
 - **Auto-scroll** — follows new logs, pauses when you scroll up
 - **MCP server** — exposes a `query_debug_logs` tool so AI agents in Cursor can search and filter your logs
