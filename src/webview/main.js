@@ -391,9 +391,9 @@
   }
 
   function formatRelativeTimestamp(timestamp) {
-    if (launchTimestamp === null) return '+0.000';
+    if (launchTimestamp === null) return '+00.000';
     const diffMs = timestamp - launchTimestamp;
-    if (diffMs < 0) return '+0.000';
+    if (diffMs < 0) return '+00.000';
 
     const totalSeconds = diffMs / 1000;
     const hours = Math.floor(totalSeconds / 3600);
@@ -407,7 +407,7 @@
     if (minutes > 0) {
       return `+${minutes}:${secStr.padStart(6, '0')}`;
     }
-    return `+${secStr}`;
+    return `+${secStr.padStart(6, '0')}`;
   }
 
   function getTimestampText(log) {
