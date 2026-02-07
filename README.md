@@ -2,6 +2,8 @@
 
 A better debug console for VS Code / Cursor. Filter, search, and let AI query your logs.
 
+![Debug Console+ demo](recording.gif)
+
 ## Features
 
 - **Level filtering** — toggle debug / info / warn / error with one click
