@@ -10,10 +10,16 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
   private autoHideTimestampsWidth: number = 200;
   private searchQuery: string = '';
   private currentLogs: ParsedLog[] = [];
+  private _dartPackageRoots: vscode.Uri[] | undefined = undefined;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
   ) {
+    // Invalidate Dart package root cache when workspace changes
+    vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      this._dartPackageRoots = undefined;
+    });
+
     // Load initial configuration
     const config = vscode.workspace.getConfiguration('debugConsolePlus');
     this.timestampMode = config.get<boolean>('showTimestamps', true) ? 'absolute' : 'hidden';
@@ -180,52 +186,76 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
     }
   }
 
+  /** Returns workspace directories that contain pubspec.yaml (Dart package roots). Cached until workspace folders change. */
+  private async getDartPackageRoots(): Promise<vscode.Uri[]> {
+    if (this._dartPackageRoots !== undefined) {
+      return this._dartPackageRoots;
+    }
+    const pubspecs = await vscode.workspace.findFiles('**/pubspec.yaml', '**/node_modules/**', 100);
+    const roots = pubspecs.map((u) => vscode.Uri.joinPath(u, '..')).filter((u, i, arr) =>
+      arr.findIndex((other) => other.fsPath === u.fsPath) === i
+    );
+    this._dartPackageRoots = roots;
+    return roots;
+  }
+
   private async openFileAtLocation(filePath: string, line?: number, column?: number, scheme?: string) {
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const tried: string[] = [];
+
     try {
-      const workspaceFolders = vscode.workspace.workspaceFolders;
       let uri: vscode.Uri | undefined;
+      const workspaceFolders = vscode.workspace.workspaceFolders;
 
-      // Build a list of candidate paths to try
-      const candidates: string[] = [filePath];
+      // For Dart package: paths, first segment is package name; rest maps to lib/. e.g. package:log_example/... -> lib/...
+      const libRelativePath =
+        scheme === 'package' && normalizedPath.includes('/')
+          ? `lib/${normalizedPath.split('/').slice(1).join('/')}`
+          : undefined;
 
-      // For Dart package: paths, the first segment is the package name and the
-      // rest maps to the lib/ directory.  e.g. package:log_example/log_simulators/error_simulator.dart
-      // becomes log_example/log_simulators/error_simulator.dart after prefix
-      // stripping.  The actual file lives at lib/log_simulators/error_simulator.dart.
-      if (scheme === 'package' && filePath.includes('/')) {
-        const segments = filePath.split('/');
-        const withoutPackageName = segments.slice(1).join('/');
-        candidates.push(`lib/${withoutPackageName}`);
-      }
-
-      // Try each candidate path in every workspace folder
-      if (workspaceFolders) {
-        for (const candidate of candidates) {
-          for (const folder of workspaceFolders) {
-            const fullPath = vscode.Uri.joinPath(folder.uri, candidate);
-            if (await this.tryStatUri(fullPath)) {
-              uri = fullPath;
-              break;
-            }
+      // 1) Try Dart package roots first with lib/ path
+      if (libRelativePath) {
+        const dartRoots = await this.getDartPackageRoots();
+        for (const root of dartRoots) {
+          const full = vscode.Uri.joinPath(root, libRelativePath);
+          tried.push(full.fsPath);
+          if (await this.tryStatUri(full)) {
+            uri = full;
+            break;
           }
-          if (uri) { break; }
         }
       }
 
-      // Fallback: search the entire workspace for the filename
+      // 2) Try each workspace folder with lib/ path, then raw path
+      if (!uri && workspaceFolders) {
+        const candidates = libRelativePath ? [libRelativePath, normalizedPath] : [normalizedPath];
+        for (const candidate of candidates) {
+          for (const folder of workspaceFolders) {
+            const full = vscode.Uri.joinPath(folder.uri, candidate);
+            tried.push(full.fsPath);
+            if (await this.tryStatUri(full)) {
+              uri = full;
+              break;
+            }
+          }
+          if (uri) break;
+        }
+      }
+
+      // 3) Fallback: search workspace by filename (increased limit, prefer lib and trailing segments)
       if (!uri) {
-        const fileName = filePath.split(/[/\\]/).pop();
+        const fileName = normalizedPath.split('/').pop();
         if (fileName) {
-          const found = await vscode.workspace.findFiles(`**/${fileName}`, '**/build/**', 5);
+          const found = await vscode.workspace.findFiles(`**/${fileName}`, '**/build/**', 50);
           if (found.length === 1) {
             uri = found[0];
           } else if (found.length > 1) {
-            // Prefer the result whose path ends with the most matching segments
-            const pathSegments = filePath.split(/[/\\]/);
+            const pathSegments = normalizedPath.split('/');
             let bestMatch: vscode.Uri | undefined;
-            let bestScore = 0;
+            let bestScore = -1;
             for (const f of found) {
-              const fSegments = f.path.split('/');
+              const fPath = f.path;
+              const fSegments = fPath.split('/');
               let score = 0;
               for (let i = 1; i <= Math.min(pathSegments.length, fSegments.length); i++) {
                 if (pathSegments[pathSegments.length - i] === fSegments[fSegments.length - i]) {
@@ -234,33 +264,34 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
                   break;
                 }
               }
+              if (fPath.includes('/lib/')) score += 10;
               if (score > bestScore) {
                 bestScore = score;
                 bestMatch = f;
               }
             }
-            uri = bestMatch || found[0];
+            uri = bestMatch ?? found[0];
           }
         }
       }
 
-      // If still not found, try as absolute path
+      // 4) Last resort: try as absolute path
       if (!uri) {
-        uri = vscode.Uri.file(filePath);
+        tried.push(vscode.Uri.file(normalizedPath).fsPath);
+        uri = vscode.Uri.file(normalizedPath);
       }
 
-      const document = await vscode.workspace.openTextDocument(uri);
-      const editor = await vscode.window.showTextDocument(document);
+      // Open with VS Code's standard command so line/column fragment is respected
+      const lineNum = line !== undefined && line > 0 ? line : 1;
+      const colNum = column !== undefined && column > 0 ? column : 1;
+      const fragment = `L${lineNum},C${colNum}`;
+      const uriWithFragment = uri.with({ fragment });
 
-      // Go to specific line and column if provided
-      if (line !== undefined && line > 0) {
-        const position = new vscode.Position(line - 1, (column || 1) - 1);
-        editor.selection = new vscode.Selection(position, position);
-        editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
-      }
+      await vscode.commands.executeCommand('vscode.open', uriWithFragment);
     } catch (error) {
       console.error('[Debug Console+] Failed to open file:', error);
-      vscode.window.showErrorMessage(`Could not open file: "${filePath}"`);
+      const triedNote = tried.length > 0 ? ` (tried workspace folders and Dart package roots)` : '';
+      vscode.window.showErrorMessage(`Could not open file: "${filePath}"${triedNote}`);
     }
   }
 
