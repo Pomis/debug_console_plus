@@ -77,6 +77,16 @@ body {
   opacity: 1;
 }
 
+.level-btn[data-level="debug"].active {
+  background-color: var(--vscode-debugIcon-startForeground, #89d185);
+  color: #000;
+}
+
+.level-btn[data-level="info"].active {
+  background-color: var(--vscode-editorInfo-foreground, #3794ff);
+  color: #fff;
+}
+
 .level-btn[data-level="warn"].active {
   background-color: var(--vscode-editorWarning-foreground, #cca700);
   color: #000;
@@ -207,20 +217,42 @@ body {
   opacity: 0.7;
 }
 
+.log-entry.debug .log-timestamp,
+.log-entry.debug .log-level {
+  color: var(--vscode-debugIcon-startForeground, #89d185);
+}
+
 .log-entry.info {
   opacity: 0.9;
 }
 
+.log-entry.info .log-timestamp,
+.log-entry.info .log-level {
+  color: var(--vscode-editorInfo-foreground, #3794ff);
+}
+
 .log-entry.warn {
-  color: var(--vscode-editorWarning-foreground, #ffa500);
+  color: var(--vscode-editorWarning-foreground, #cca700);
+}
+
+.log-entry.warn .log-timestamp,
+.log-entry.warn .log-level {
+  color: var(--vscode-editorWarning-foreground, #cca700);
 }
 
 .log-entry.error {
   color: var(--vscode-editorError-foreground, #f48771);
 }
 
+.log-entry.error .log-timestamp,
+.log-entry.error .log-level {
+  color: var(--vscode-editorError-foreground, #f48771);
+}
+
 .log-timestamp {
   flex-shrink: 0;
+  min-width: 12ch;
+  text-align: right;
   color: var(--vscode-descriptionForeground, #999);
   font-size: 0.9em;
   white-space: nowrap;
@@ -300,6 +332,18 @@ body {
   color: var(--vscode-symbolIcon-classForeground, var(--vscode-textLink-foreground, #4ec9b0));
   font-weight: 600;
 }
+
+/* JSON syntax highlighting (nested bracket colors + token types) */
+.json-bracket.json-depth-0 { color: #e5c07b; }
+.json-bracket.json-depth-1 { color: #c678dd; }
+.json-bracket.json-depth-2 { color: #56b6c2; }
+.json-bracket.json-depth-3 { color: #98c379; }
+.json-bracket.json-depth-4 { color: #d19a66; }
+.json-bracket.json-depth-5 { color: #61afef; }
+.json-key { color: #9cdcfe; }
+.json-string { color: #ce9178; }
+.json-number { color: #b5cea8; }
+.json-punctuation { color: var(--vscode-descriptionForeground, #6a737d); }
 
 /* Context menu */
 .context-menu {
