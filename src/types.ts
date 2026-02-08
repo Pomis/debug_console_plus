@@ -1,5 +1,8 @@
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
+/** DAP output event group: start/end of a logical group (e.g. box borders around a log entry). */
+export type DapOutputGroup = 'start' | 'startCollapsed' | 'end';
+
 export interface ParsedLog {
   id: string;
   timestamp: number;
@@ -7,6 +10,8 @@ export interface ParsedLog {
   message: string;
   category: string;
   sessionId: string;
+  /** Set when DAP output event had group; used for level inheritance from content line. */
+  group?: DapOutputGroup;
 }
 
 export type TimestampMode = 'absolute' | 'relative' | 'hidden';
