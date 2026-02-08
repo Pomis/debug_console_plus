@@ -484,9 +484,13 @@
       });
     }
 
-    // Save scroll position before recalculating (if not auto-scrolling)
+    // Decide from current scroll state (avoids race when new logs arrive)
+    const wasAtBottom = logsContainer.scrollHeight - logsContainer.scrollTop <= containerHeight + 50;
+    shouldAutoScroll = wasAtBottom;
+
+    // Save scroll position before recalculating (if not at bottom)
     let savedScrollTop = 0;
-    if (!shouldAutoScroll) {
+    if (!wasAtBottom) {
       savedScrollTop = logsContainer.scrollTop;
     }
 
@@ -494,17 +498,21 @@
     recalculatePositions();
 
     // Restore scroll position if we saved it
-    if (!shouldAutoScroll) {
+    if (!wasAtBottom) {
       logsContainer.scrollTop = savedScrollTop;
       scrollTop = savedScrollTop;
     }
 
     scheduleRender(true); // Force render on filter change
 
-    if (shouldAutoScroll) scrollToBottom();
+    if (wasAtBottom) scrollToBottom();
   }
 
   function applyFiltersIncremental(fromIndex) {
+    // Decide from current scroll state (avoids race: user scrolled up but scroll event not fired yet)
+    const wasAtBottom = logsContainer.scrollHeight - logsContainer.scrollTop <= containerHeight + 50;
+    shouldAutoScroll = wasAtBottom;
+
     const newLogs = allLogs.slice(fromIndex);
     let newFiltered;
     const hasFilter = searchQuery && searchQuery.trim().length > 0;
@@ -530,9 +538,9 @@
 
     if (newFiltered.length === 0) return; // No new filtered logs, skip update
 
-    // Save scroll position before recalculating (if not auto-scrolling)
+    // Save scroll position before recalculating (if not at bottom)
     let savedScrollTop = 0;
-    if (!shouldAutoScroll) {
+    if (!wasAtBottom) {
       savedScrollTop = logsContainer.scrollTop;
     }
 
@@ -540,18 +548,18 @@
     recalculatePositions();
 
     // Restore scroll position if we saved it
-    if (!shouldAutoScroll) {
+    if (!wasAtBottom) {
       logsContainer.scrollTop = savedScrollTop;
       scrollTop = savedScrollTop;
     }
 
-    // Only re-render if auto-scrolling or if new items are in visible range
-    const needsRender = shouldAutoScroll || (newFiltered.length > 0 && filteredLogs.length - newFiltered.length < visibleEndIndex);
+    // Only re-render if was at bottom or if new items are in visible range
+    const needsRender = wasAtBottom || (newFiltered.length > 0 && filteredLogs.length - newFiltered.length < visibleEndIndex);
     if (needsRender) {
       scheduleRender();
     }
 
-    if (shouldAutoScroll) scrollToBottom();
+    if (wasAtBottom) scrollToBottom();
   }
 
   function scrollToBottom() {
