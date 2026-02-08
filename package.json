@@ -1,9 +1,9 @@
 {
   "name": "debug-console-plus",
-  "displayName": "Debug Console+",
+  "displayName": "Debug Console+ (Beta)",
   "publisher": "Pomisoft",
   "description": "A better debug console with filtering, search, and MCP integration",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "icon": "icon.png",
   "repository": {
     "type": "git",
