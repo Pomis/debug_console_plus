@@ -210,22 +210,26 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    const fileUri = await vscode.window.showSaveDialog({
-      filters: {
-        'JSON': ['json']
-      },
-      defaultUri: vscode.Uri.file('debug-logs.json'),
-      saveLabel: 'Save Logs'
-    });
-
-    if (!fileUri) {
-      return; // User cancelled
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) {
+      vscode.window.showErrorMessage('No workspace folder open.');
+      return;
     }
+
+    const logsDir = path.join(workspaceFolder.uri.fsPath, '.debug_console_plus');
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
+    const filename = `debug-logs_${timestamp}.json`;
+    const fileUri = vscode.Uri.file(path.join(logsDir, filename));
 
     try {
       const jsonContent = JSON.stringify(logs, null, 2);
       await vscode.workspace.fs.writeFile(fileUri, Buffer.from(jsonContent, 'utf8'));
-      vscode.window.showInformationMessage(`Saved ${logs.length} log${logs.length === 1 ? '' : 's'} to ${path.basename(fileUri.fsPath)}`);
+      vscode.window.showInformationMessage(`Saved ${logs.length} log${logs.length === 1 ? '' : 's'} to .debug_console_plus/${filename}`);
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to save logs: ${error}`);
     }
@@ -237,12 +241,18 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const defaultDir = workspaceFolder
+      ? vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, '.debug_console_plus'))
+      : undefined;
+
     const fileUris = await vscode.window.showOpenDialog({
       filters: {
         'JSON': ['json']
       },
       canSelectMany: false,
-      openLabel: 'Load Logs'
+      openLabel: 'Load Logs',
+      defaultUri: defaultDir
     });
 
     if (!fileUris || fileUris.length === 0) {
