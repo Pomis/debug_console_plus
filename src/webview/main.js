@@ -31,6 +31,9 @@
   // File path regex (supports package: and dart: URI scheme prefixes)
   const FILE_PATH_REGEX = /(package:|dart:)?([a-zA-Z0-9_\-./\\]+\.(?:dart|kt|java|ts|js|tsx|jsx|py|rb|go|rs|cpp|c|h|hpp|swift|m|mm|json|xml|yaml|yml|gradle|properties|txt|md|html|css|scss|less)):(\d+)(?::(\d+))?/g;
 
+  // URL regex for clickable HTTP/HTTPS links
+  const URL_REGEX = /https?:\/\/[^\s"'<>)\]},]+/g;
+
   // Matches verbose prefixes to strip:
   // Old logger: [tag] | timestamp ms | message
   // New logger: HH:mm:ss.SSS LEVEL message
@@ -715,16 +718,18 @@
         continue;
       }
 
-      if (/[-0-9]/.test(c) || (c === 't' && jsonStr.slice(i, i + 4) === 'true') || (c === 'f' && jsonStr.slice(i, i + 5) === 'false') || (c === 'n' && jsonStr.slice(i, i + 4) === 'null')) {
-        let start = i;
-        if (jsonStr.slice(i, i + 4) === 'true') i += 4;
-        else if (jsonStr.slice(i, i + 5) === 'false') i += 5;
-        else if (jsonStr.slice(i, i + 4) === 'null') i += 4;
-        else {
-          if (jsonStr[i] === '-') i++;
-          while (i < len && /[0-9.eE+-]/.test(jsonStr[i])) i++;
+      // Bare value: consume the entire unquoted token, then classify
+      const bareStart = i;
+      while (i < len && !/[\s{}\[\]:,'"&<>]/.test(jsonStr[i])) i++;
+      if (i > bareStart) {
+        const token = jsonStr.slice(bareStart, i);
+        if (token === 'true' || token === 'false' || token === 'null') {
+          out += `<span class="json-number">${token}</span>`;
+        } else if (/^-?(\d+\.?\d*|\d*\.?\d+)([eE][+-]?\d+)?$/.test(token)) {
+          out += `<span class="json-number">${token}</span>`;
+        } else {
+          out += token;
         }
-        out += `<span class="json-number">${jsonStr.slice(start, i)}</span>`;
         continue;
       }
 
@@ -773,6 +778,12 @@
     let html = highlightSearchMatches(compactMessage(text));
     html = applyTagHighlighting(html);
     html = applyJsonHighlighting(html);
+    // URL links: make http/https URLs clickable (run before file-link regex to avoid conflicts)
+    // Note: match is already HTML-escaped text, so we unescape for the data attribute and keep as-is for display
+    html = html.replace(URL_REGEX, (match) => {
+      const realUrl = match.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
+      return `<span class="url-link" data-url="${escapeHtml(realUrl)}">${match}</span>`;
+    });
     // File links: data-scheme is "package" or "dart" (no colon); data-path is the path after the scheme (e.g. log_example/.../file.dart)
     return html.replace(FILE_PATH_REGEX, (match, prefix, path, line, col) => {
       const scheme = prefix ? prefix.replace(':', '') : '';
@@ -857,17 +868,28 @@
   }
 
   function handleClick(e) {
-    const link = e.target.closest('.file-link');
-    if (link) {
+    const fileLink = e.target.closest('.file-link');
+    if (fileLink) {
       e.preventDefault();
       e.stopPropagation();
       // Extension expects: filePath (path only), line/column numbers, scheme '' or 'package'/'dart'
       vscode.postMessage({
         type: 'openFile',
-        filePath: link.dataset.path,
-        line: parseInt(link.dataset.line, 10),
-        column: parseInt(link.dataset.col, 10),
-        scheme: link.dataset.scheme || ''
+        filePath: fileLink.dataset.path,
+        line: parseInt(fileLink.dataset.line, 10),
+        column: parseInt(fileLink.dataset.col, 10),
+        scheme: fileLink.dataset.scheme || ''
+      });
+      return;
+    }
+
+    const urlLink = e.target.closest('.url-link');
+    if (urlLink) {
+      e.preventDefault();
+      e.stopPropagation();
+      vscode.postMessage({
+        type: 'openUrl',
+        url: urlLink.dataset.url
       });
     }
   }

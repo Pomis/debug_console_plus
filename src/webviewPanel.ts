@@ -77,6 +77,11 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
               await this.openFileAtLocation(message.filePath, message.line, message.column, message.scheme);
             }
             break;
+          case 'openUrl':
+            if (message.url) {
+              vscode.env.openExternal(vscode.Uri.parse(message.url));
+            }
+            break;
         }
       }
     );

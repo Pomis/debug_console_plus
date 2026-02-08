@@ -23,12 +23,13 @@ export interface WebviewMessage {
 }
 
 export interface WebviewToExtensionMessage {
-  type: 'ready' | 'toggleLevel' | 'search' | 'copyAll' | 'toggleTimestamps' | 'openFile';
+  type: 'ready' | 'toggleLevel' | 'search' | 'copyAll' | 'toggleTimestamps' | 'openFile' | 'openUrl';
   level?: LogLevel;
   searchQuery?: string;
   filePath?: string;
   line?: number;
   column?: number;
   scheme?: string;
+  url?: string;
 }
 
