@@ -61,22 +61,22 @@
           "group": "navigation@4"
         },
         {
-          "command": "debugConsolePlus.clear",
+          "command": "debugConsolePlus.setupMcp",
           "when": "view == debugConsolePlusView",
           "group": "navigation@5"
         },
         {
-          "command": "debugConsolePlus.setupMcp",
+          "command": "debugConsolePlus.saveLogs",
           "when": "view == debugConsolePlusView",
           "group": "navigation@6"
         },
         {
-          "command": "debugConsolePlus.saveLogs",
+          "command": "debugConsolePlus.loadLogs",
           "when": "view == debugConsolePlusView",
           "group": "navigation@7"
         },
         {
-          "command": "debugConsolePlus.loadLogs",
+          "command": "debugConsolePlus.clear",
           "when": "view == debugConsolePlusView",
           "group": "navigation@8"
         }
