@@ -1,5 +1,7 @@
 # Debug Console+
 
+[![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/Pomisoft.debug-console-plus?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=Pomisoft.debug-console-plus)
+
 A better debug console for VS Code / Cursor. Filter, search, and let AI query your logs.
 
 ![Debug Console+ demo](recording.gif)

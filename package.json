@@ -3,7 +3,7 @@
   "displayName": "Debug Console+",
   "publisher": "Pomisoft",
   "description": "A better debug console with filtering, search, and MCP integration",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "icon": "icon.png",
   "repository": {
     "type": "git",
