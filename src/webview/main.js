@@ -14,6 +14,7 @@
   let compactMessages = false;
   let highlightTags = true; // true = highlight [TAGS], false = plain text
   let filterLogicAnd = true; // true = AND, false = OR
+  let localPackageNames = new Set(); // package names that are in the user's workspace (for link styling)
 
   // Virtual scroll state - variable height
   const DEFAULT_ITEM_HEIGHT = 20;
@@ -29,7 +30,7 @@
   let pendingRender = false;
 
   // File path regex (supports package: and dart: URI scheme prefixes)
-  const FILE_PATH_REGEX = /(package:|dart:)?([a-zA-Z0-9_\-./\\]+\.(?:dart|kt|java|ts|js|tsx|jsx|py|rb|go|rs|cpp|c|h|hpp|swift|m|mm|json|xml|yaml|yml|gradle|properties|txt|md|html|css|scss|less)):(\d+)(?::(\d+))?/g;
+  const FILE_PATH_REGEX = /(package:|dart:)?([a-zA-Z0-9_+\-./\\]+\.(?:dart|kt|java|ts|js|tsx|jsx|py|rb|go|rs|cpp|c|h|hpp|swift|m|mm|json|xml|yaml|yml|gradle|properties|txt|md|html|css|scss|less)):(\d+)(?::(\d+))?/g;
 
   // URL regex for clickable HTTP/HTTPS links
   const URL_REGEX = /https?:\/\/[^\s"'<>)\]},]+/g;
@@ -312,6 +313,10 @@
         break;
       case 'toggleTags':
         toggleTagHighlighting();
+        break;
+      case 'packageInfo':
+        localPackageNames = new Set(message.localPackageNames || []);
+        applyFilters();
         break;
     }
   });
@@ -787,7 +792,9 @@
     // File links: data-scheme is "package" or "dart" (no colon); data-path is the path after the scheme (e.g. log_example/.../file.dart)
     return html.replace(FILE_PATH_REGEX, (match, prefix, path, line, col) => {
       const scheme = prefix ? prefix.replace(':', '') : '';
-      return `<span class="file-link" data-path="${escapeHtml(path)}" data-line="${line}" data-col="${col || '1'}" data-scheme="${escapeHtml(scheme)}">${match}</span>`;
+      const isExternal = scheme === 'dart' || (scheme === 'package' && path.includes('/') && !localPackageNames.has(path.split('/')[0]));
+      const externalAttr = isExternal ? ' data-external="true"' : '';
+      return `<span class="file-link${isExternal ? ' file-link--external' : ''}" data-path="${escapeHtml(path)}" data-line="${line}" data-col="${col || '1'}" data-scheme="${escapeHtml(scheme)}"${externalAttr}>${match}</span>`;
     });
   }
 

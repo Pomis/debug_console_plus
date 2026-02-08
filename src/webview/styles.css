@@ -309,7 +309,7 @@ body {
   background-color: var(--vscode-scrollbarSlider-hoverBackground);
 }
 
-/* Clickable file links */
+/* Clickable file links - user codebase (default) */
 .file-link,
 .url-link {
   color: var(--vscode-textLink-foreground, #3794ff);
@@ -321,6 +321,16 @@ body {
 .url-link:hover {
   color: var(--vscode-textLink-activeForeground, #3794ff);
   text-decoration: underline;
+}
+
+/* Flutter/Dart SDK and external package links - muted so they're distinct from user code */
+.file-link--external {
+  color: var(--vscode-descriptionForeground, #858585);
+}
+
+.file-link--external:hover {
+  color: var(--vscode-descriptionForeground, #858585);
+  opacity: 0.9;
 }
 
 /* Search highlight */

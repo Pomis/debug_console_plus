@@ -1,4 +1,7 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
+import { execSync } from 'child_process';
 import { ParsedLog, TimestampMode, WebviewMessage, WebviewToExtensionMessage } from './types';
 import { formatTimestamp } from './logParser';
 
@@ -11,13 +14,16 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
   private searchQuery: string = '';
   private currentLogs: ParsedLog[] = [];
   private _dartPackageRoots: vscode.Uri[] | undefined = undefined;
+  private _packageConfig: Map<string, { rootUri: string; packageUri: string }> | undefined = undefined;
+  private _flutterSdkPath: string | undefined | null = undefined;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
   ) {
-    // Invalidate Dart package root cache when workspace changes
+    // Invalidate caches when workspace changes
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       this._dartPackageRoots = undefined;
+      this._packageConfig = undefined;
     });
 
     // Load initial configuration
@@ -131,6 +137,29 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
     }
   }
 
+  private async sendPackageInfo() {
+    if (!this._view) return;
+    const pkgConfig = await this.getPackageConfig();
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const workspacePaths = workspaceFolders?.map((f) => f.uri.fsPath.toLowerCase()) ?? [];
+    const localPackageNames: string[] = [];
+    for (const [name, entry] of pkgConfig) {
+      try {
+        const rootPath = vscode.Uri.parse(entry.rootUri).fsPath.toLowerCase();
+        const underWorkspace = workspacePaths.some((wp) => rootPath === wp || rootPath.startsWith(wp + path.sep));
+        if (underWorkspace) {
+          localPackageNames.push(name);
+        }
+      } catch {
+        // ignore invalid rootUri
+      }
+    }
+    this._view.webview.postMessage({
+      type: 'packageInfo',
+      localPackageNames,
+    } as WebviewMessage);
+  }
+
   private sendConfig() {
     if (this._view) {
       const config = vscode.workspace.getConfiguration('debugConsolePlus');
@@ -144,6 +173,7 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
           defaultLevels: defaultLevels,
         },
       } as WebviewMessage);
+      this.sendPackageInfo();
     }
   }
 
@@ -204,6 +234,90 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
     return roots;
   }
 
+  /** Loads .dart_tool/package_config.json from workspace roots and returns package name -> { rootUri, packageUri }. Cached until workspace folders change. */
+  private async getPackageConfig(): Promise<Map<string, { rootUri: string; packageUri: string }>> {
+    if (this._packageConfig !== undefined) {
+      return this._packageConfig;
+    }
+    const map = new Map<string, { rootUri: string; packageUri: string }>();
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders?.length) {
+      this._packageConfig = map;
+      return map;
+    }
+    for (const folder of folders) {
+      const configUri = vscode.Uri.joinPath(folder.uri, '.dart_tool', 'package_config.json');
+      try {
+        const bytes = await vscode.workspace.fs.readFile(configUri);
+        const json = JSON.parse(Buffer.from(bytes).toString('utf8')) as { packages?: Array<{ name: string; rootUri: string; packageUri?: string }> };
+        const packages = json.packages ?? [];
+        for (const pkg of packages) {
+          if (pkg.name && pkg.rootUri) {
+            const packageUri = pkg.packageUri ?? 'lib/';
+            if (!map.has(pkg.name)) {
+              map.set(pkg.name, { rootUri: pkg.rootUri, packageUri });
+            }
+          }
+        }
+      } catch {
+        // No package_config in this folder or invalid JSON
+      }
+    }
+    this._packageConfig = map;
+    return map;
+  }
+
+  /** Returns Flutter SDK path (directory containing bin/flutter). Cached. */
+  private async getFlutterSdkPath(): Promise<string | undefined> {
+    if (this._flutterSdkPath !== undefined) {
+      return this._flutterSdkPath ?? undefined;
+    }
+    let sdkPath: string | undefined;
+    const config = vscode.workspace.getConfiguration('dart');
+    sdkPath = config.get<string>('flutterSdkPath');
+    if (sdkPath?.trim()) {
+      this._flutterSdkPath = sdkPath.trim();
+      return this._flutterSdkPath;
+    }
+    sdkPath = config.get<string>('sdkPath');
+    if (sdkPath?.trim()) {
+      const dartSdk = sdkPath.trim();
+      const parent = path.dirname(dartSdk);
+      if (path.basename(parent) === 'bin') {
+        this._flutterSdkPath = path.dirname(parent);
+        return this._flutterSdkPath ?? undefined;
+      }
+    }
+    const env = process.env.FLUTTER_ROOT;
+    if (env?.trim()) {
+      this._flutterSdkPath = env.trim();
+      return this._flutterSdkPath;
+    }
+    try {
+      const which = process.platform === 'win32' ? 'where flutter' : 'which flutter';
+      const out = execSync(which, { encoding: 'utf8', timeout: 2000 }).trim();
+      const line = out.split(/[\r\n]/)[0];
+      if (line) {
+        let bin = line;
+        try {
+          bin = fs.realpathSync(line);
+        } catch {
+          // keep line as-is
+        }
+        const binDir = path.dirname(bin);
+        const sdkDir = path.dirname(binDir);
+        if (fs.existsSync(path.join(sdkDir, 'bin', 'flutter'))) {
+          this._flutterSdkPath = sdkDir;
+          return this._flutterSdkPath;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    this._flutterSdkPath = null;
+    return undefined;
+  }
+
   private async openFileAtLocation(filePath: string, line?: number, column?: number, scheme?: string) {
     const normalizedPath = filePath.replace(/\\/g, '/');
     const tried: string[] = [];
@@ -212,14 +326,46 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
       let uri: vscode.Uri | undefined;
       const workspaceFolders = vscode.workspace.workspaceFolders;
 
-      // For Dart package: paths, first segment is package name; rest maps to lib/. e.g. package:log_example/... -> lib/...
+      // 1) Resolve dart: URIs via Flutter SDK (e.g. dart:ui/painting.dart -> sdk/bin/cache/pkg/sky_engine/lib/ui/painting.dart)
+      if (scheme === 'dart' && normalizedPath) {
+        const flutterSdk = await this.getFlutterSdkPath();
+        if (flutterSdk) {
+          const skyEngineLib = path.join(flutterSdk, 'bin', 'cache', 'pkg', 'sky_engine', 'lib');
+          const fullPath = path.join(skyEngineLib, normalizedPath);
+          const fileUri = vscode.Uri.file(fullPath);
+          tried.push(fullPath);
+          if (await this.tryStatUri(fileUri)) {
+            uri = fileUri;
+          }
+        }
+      }
+
+      // 2) Resolve package: URIs via .dart_tool/package_config.json (e.g. package:flutter/src/... -> flutter SDK package path)
+      if (!uri && scheme === 'package' && normalizedPath.includes('/')) {
+        const segments = normalizedPath.split('/');
+        const packageName = segments[0];
+        const relativePath = segments.slice(1).join('/');
+        const pkgConfig = await this.getPackageConfig();
+        const entry = pkgConfig.get(packageName);
+        if (entry) {
+          const rootUriParsed = vscode.Uri.parse(entry.rootUri);
+          const packageUri = entry.packageUri.endsWith('/') ? entry.packageUri.slice(0, -1) : entry.packageUri;
+          const full = vscode.Uri.joinPath(rootUriParsed, packageUri, ...relativePath.split('/'));
+          tried.push(full.fsPath);
+          if (await this.tryStatUri(full)) {
+            uri = full;
+          }
+        }
+      }
+
+      // For Dart package: paths (fallback), first segment is package name; rest maps to lib/.
       const libRelativePath =
-        scheme === 'package' && normalizedPath.includes('/')
+        !uri && scheme === 'package' && normalizedPath.includes('/')
           ? `lib/${normalizedPath.split('/').slice(1).join('/')}`
           : undefined;
 
-      // 1) Try Dart package roots first with lib/ path
-      if (libRelativePath) {
+      // 3) Try Dart package roots with lib/ path (workspace packages)
+      if (!uri && libRelativePath) {
         const dartRoots = await this.getDartPackageRoots();
         for (const root of dartRoots) {
           const full = vscode.Uri.joinPath(root, libRelativePath);
@@ -231,7 +377,7 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
         }
       }
 
-      // 2) Try each workspace folder with lib/ path, then raw path
+      // 5) Try each workspace folder with lib/ path, then raw path
       if (!uri && workspaceFolders) {
         const candidates = libRelativePath ? [libRelativePath, normalizedPath] : [normalizedPath];
         for (const candidate of candidates) {
@@ -247,7 +393,7 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
         }
       }
 
-      // 3) Fallback: search workspace by filename (increased limit, prefer lib and trailing segments)
+      // 6) Fallback: search workspace by filename (increased limit, prefer lib and trailing segments)
       if (!uri) {
         const fileName = normalizedPath.split('/').pop();
         if (fileName) {
@@ -280,7 +426,7 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
         }
       }
 
-      // 4) Last resort: try as absolute path
+      // 7) Last resort: try as absolute path
       if (!uri) {
         tried.push(vscode.Uri.file(normalizedPath).fsPath);
         uri = vscode.Uri.file(normalizedPath);

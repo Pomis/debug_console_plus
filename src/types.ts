@@ -12,7 +12,7 @@ export interface ParsedLog {
 export type TimestampMode = 'absolute' | 'relative' | 'hidden';
 
 export interface WebviewMessage {
-  type: 'logs' | 'clear' | 'config' | 'setFilter' | 'copyAll' | 'toggleCompact' | 'toggleTags';
+  type: 'logs' | 'clear' | 'config' | 'setFilter' | 'copyAll' | 'toggleCompact' | 'toggleTags' | 'packageInfo';
   logs?: ParsedLog[];
   config?: {
     timestampMode: TimestampMode;
@@ -20,6 +20,8 @@ export interface WebviewMessage {
     defaultLevels?: string[];
   };
   filter?: string;
+  /** Package names whose rootUri is under a workspace folder (user code). Sent so webview can style links. */
+  localPackageNames?: string[];
 }
 
 export interface WebviewToExtensionMessage {
