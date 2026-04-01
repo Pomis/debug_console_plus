@@ -17,7 +17,9 @@
   let localPackageNames = new Set(); // package names that are in the user's workspace (for link styling)
   let filterDebounceTimer = null;
   const FILTER_DEBOUNCE_MS = 150;
-  /** Index into filteredLogs for prev/next navigation; -1 until user navigates with arrows or Enter. */
+  /** Indices into filteredLogs whose message matches the search text (OR mode can include level-only rows). */
+  let searchLineIndices = [];
+  /** Ordinal among searchLineIndices for prev/next; -1 until user navigates with arrows or Enter. */
   let searchMatchIndex = -1;
 
   // Virtual scroll state - variable height
@@ -52,7 +54,7 @@
 
   // DOM elements
   const logsContainer = document.getElementById('logsContainer');
-  const levelButtons = document.querySelectorAll('.level-btn');
+  const levelButtons = document.querySelectorAll('#levelFilters .level-btn');
   const filterInput = document.getElementById('filterInput');
   const logicToggle = document.getElementById('logicToggle');
   const searchNav = document.getElementById('searchNav');
@@ -81,7 +83,8 @@
           updateSearchRegex();
           updateLogicToggleState();
           applyFilters();
-          if (searchQuery.trim().length > 0 && filteredLogs.length > 0) {
+          recomputeSearchLineIndices();
+          if (searchQuery.trim().length > 0 && searchLineIndices.length > 0) {
             e.preventDefault();
             navigateSearchMatch(e.shiftKey ? -1 : 1);
           }
@@ -451,11 +454,21 @@
     }
   }
 
+  function recomputeSearchLineIndices() {
+    searchLineIndices = [];
+    if (!searchQuery.trim()) return;
+    for (let i = 0; i < filteredLogs.length; i++) {
+      if (matchesSearchQuery(filteredLogs[i])) {
+        searchLineIndices.push(i);
+      }
+    }
+  }
+
   function clampSearchMatchIndex() {
-    if (filteredLogs.length === 0) {
+    if (searchLineIndices.length === 0) {
       searchMatchIndex = -1;
-    } else if (searchMatchIndex >= filteredLogs.length) {
-      searchMatchIndex = filteredLogs.length - 1;
+    } else if (searchMatchIndex >= searchLineIndices.length) {
+      searchMatchIndex = searchLineIndices.length - 1;
     }
   }
 
@@ -465,13 +478,14 @@
     searchNav.hidden = !hasSearch;
     if (!hasSearch) return;
 
+    recomputeSearchLineIndices();
     clampSearchMatchIndex();
-    const total = filteredLogs.length;
+    const total = searchLineIndices.length;
     if (searchNavCount) {
       if (total === 0) {
         searchNavCount.textContent = '0';
       } else if (searchMatchIndex < 0) {
-        searchNavCount.textContent = `- / ${total}`;
+        searchNavCount.textContent = `1 / ${total}`;
       } else {
         searchNavCount.textContent = `${searchMatchIndex + 1} / ${total}`;
       }
@@ -484,8 +498,9 @@
   }
 
   function navigateSearchMatch(delta) {
-    if (!searchQuery.trim() || filteredLogs.length === 0) return;
-    const n = filteredLogs.length;
+    recomputeSearchLineIndices();
+    if (!searchQuery.trim() || searchLineIndices.length === 0) return;
+    const n = searchLineIndices.length;
     if (searchMatchIndex < 0) {
       searchMatchIndex = delta > 0 ? 0 : n - 1;
     } else {
@@ -496,7 +511,8 @@
   }
 
   function scrollToSearchMatch() {
-    const i = searchMatchIndex;
+    if (searchMatchIndex < 0 || searchMatchIndex >= searchLineIndices.length) return;
+    const i = searchLineIndices[searchMatchIndex];
     if (i < 0 || i >= filteredLogs.length) return;
 
     measureItem(i);
