@@ -345,16 +345,18 @@ body {
   font-weight: 600;
 }
 
-/* JSON syntax highlighting (nested bracket colors + token types) */
-.json-bracket.json-depth-0 { color: #e5c07b; }
-.json-bracket.json-depth-1 { color: #c678dd; }
-.json-bracket.json-depth-2 { color: #56b6c2; }
-.json-bracket.json-depth-3 { color: #98c379; }
-.json-bracket.json-depth-4 { color: #d19a66; }
-.json-bracket.json-depth-5 { color: #61afef; }
-.json-key { color: #9cdcfe; }
-.json-string { color: #ce9178; }
-.json-number { color: #b5cea8; }
+/* JSON syntax highlighting — uses VS Code theme-adaptive variables */
+.json-bracket.json-depth-0 { color: var(--vscode-editorBracketHighlight-foreground1, #ffd700); }
+.json-bracket.json-depth-1 { color: var(--vscode-editorBracketHighlight-foreground2, #da70d6); }
+.json-bracket.json-depth-2 { color: var(--vscode-editorBracketHighlight-foreground3, #179fff); }
+.json-bracket.json-depth-3 { color: var(--vscode-editorBracketHighlight-foreground4, #ffd700); }
+.json-bracket.json-depth-4 { color: var(--vscode-editorBracketHighlight-foreground5, #da70d6); }
+.json-bracket.json-depth-5 { color: var(--vscode-editorBracketHighlight-foreground6, #179fff); }
+.json-key { color: var(--vscode-debugTokenExpression-name, #9cdcfe); }
+.json-string { color: var(--vscode-debugTokenExpression-string, #ce9178); }
+.json-number { color: var(--vscode-debugTokenExpression-number, #b5cea8); }
+.json-bool { color: var(--vscode-debugTokenExpression-boolean, #4e94ce); }
+.json-null { color: var(--vscode-debugTokenExpression-error, #f48771); font-style: italic; }
 .json-punctuation { color: var(--vscode-descriptionForeground, #6a737d); }
 
 /* Context menu */

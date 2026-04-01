@@ -1,14 +1,15 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { DapOutputGroup, ParsedLog } from './types';
+import { promises as fsp } from 'fs';
+import { DapOutputGroup, LogsUpdate, ParsedLog } from './types';
 import { parseLogEntry } from './logParser';
 
 export class DebugSessionTracker implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private logs: ParsedLog[] = [];
   private currentSessionId: string | null = null;
-  private onLogCallback?: (logs: ParsedLog[]) => void;
+  private onLogCallback?: (update: LogsUpdate) => void;
   private maxLogs: number;
   private logsDir: string | null = null;
   private logsFilePath: string | null = null;
@@ -37,7 +38,7 @@ export class DebugSessionTracker implements vscode.Disposable {
 
     // Write initial empty array if file doesn't exist
     if (!fs.existsSync(this.logsFilePath)) {
-      this.writeLogsToFile();
+      this.writeLogsToFileSync();
     }
   }
 
@@ -46,6 +47,9 @@ export class DebugSessionTracker implements vscode.Disposable {
     const startDisposable = vscode.debug.onDidStartDebugSession((session) => {
       this.currentSessionId = session.id;
       this.logs = [];
+      if (this.onLogCallback) {
+        this.onLogCallback({ type: 'full', logs: [] });
+      }
       console.log(`[Debug Console+] Debug session started: ${session.id}`);
     });
 
@@ -111,14 +115,19 @@ export class DebugSessionTracker implements vscode.Disposable {
     }
     // group === 'start' | 'startCollapsed': level will be set when the next content line arrives
 
-    // Limit log count
-    if (this.logs.length > this.maxLogs) {
-      this.logs.shift();
+    // Limit log count (batch trim when 10% over to avoid O(n) on every log)
+    const didTrim = this.logs.length > this.maxLogs * 1.1;
+    if (didTrim) {
+      this.logs = this.logs.slice(-this.maxLogs);
     }
 
-    // Notify callback
+    // Notify callback: incremental append, or full if we trimmed (webview must stay in sync)
     if (this.onLogCallback) {
-      this.onLogCallback([...this.logs]);
+      if (didTrim) {
+        this.onLogCallback({ type: 'full', logs: [...this.logs] });
+      } else {
+        this.onLogCallback({ type: 'append', log });
+      }
     }
 
     // Persist to file (debounced)
@@ -140,30 +149,40 @@ export class DebugSessionTracker implements vscode.Disposable {
 
     // Schedule new write
     this.writeTimeout = setTimeout(() => {
-      this.writeLogsToFile();
+      this.writeLogsToFileAsync();
       this.writeTimeout = null;
     }, this.WRITE_DEBOUNCE_MS);
   }
 
   /**
-   * Write current logs to JSON file
+   * Write current logs to JSON file (async, compact JSON)
    */
-  private writeLogsToFile() {
+  private async writeLogsToFileAsync() {
     if (!this.logsFilePath) {
       return;
     }
 
     try {
-      fs.writeFileSync(this.logsFilePath, JSON.stringify(this.logs, null, 2), 'utf8');
+      await fsp.writeFile(this.logsFilePath, JSON.stringify(this.logs), 'utf8');
+    } catch (error) {
+      console.error('[Debug Console+] Failed to write logs to file:', error);
+    }
+  }
+
+  /** Sync write for final flush on dispose */
+  private writeLogsToFileSync() {
+    if (!this.logsFilePath) return;
+    try {
+      fs.writeFileSync(this.logsFilePath, JSON.stringify(this.logs), 'utf8');
     } catch (error) {
       console.error('[Debug Console+] Failed to write logs to file:', error);
     }
   }
 
   /**
-   * Set callback for when new logs are received
+   * Set callback for when logs are updated (full replace or single append)
    */
-  public onLog(callback: (logs: ParsedLog[]) => void) {
+  public onLog(callback: (update: LogsUpdate) => void) {
     this.onLogCallback = callback;
   }
 
@@ -180,10 +199,10 @@ export class DebugSessionTracker implements vscode.Disposable {
   public clearLogs() {
     this.logs = [];
     if (this.onLogCallback) {
-      this.onLogCallback([]);
+      this.onLogCallback({ type: 'full', logs: [] });
     }
     // Also clear the file
-    this.writeLogsToFile();
+    this.writeLogsToFileSync();
   }
 
   /**
@@ -192,10 +211,10 @@ export class DebugSessionTracker implements vscode.Disposable {
   public loadLogs(logs: ParsedLog[]) {
     this.logs = logs;
     if (this.onLogCallback) {
-      this.onLogCallback([...this.logs]);
+      this.onLogCallback({ type: 'full', logs: [...this.logs] });
     }
     // Write to file so MCP server can access loaded logs
-    this.writeLogsToFile();
+    this.writeLogsToFileSync();
   }
 
   /**
@@ -212,7 +231,7 @@ export class DebugSessionTracker implements vscode.Disposable {
     // Write logs one final time before disposing
     if (this.writeTimeout) {
       clearTimeout(this.writeTimeout);
-      this.writeLogsToFile();
+      this.writeLogsToFileSync();
     }
 
     this.disposables.forEach((d) => d.dispose());

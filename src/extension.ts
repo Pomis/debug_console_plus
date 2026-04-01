@@ -49,9 +49,9 @@ export function activate(context: vscode.ExtensionContext) {
   console.log('[Debug Console+] View provider registered with type:', DebugConsolePlusViewProvider.viewType);
 
   // Set up log callback
-  tracker.onLog((logs) => {
+  tracker.onLog((update) => {
     if (viewProvider) {
-      viewProvider.sendLogs(logs);
+      viewProvider.handleLogsUpdate(update);
     }
   });
 

@@ -1,8 +1,11 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { execSync } from 'child_process';
-import { ParsedLog, TimestampMode, WebviewMessage, WebviewToExtensionMessage } from './types';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+
+const execFileAsync = promisify(execFile);
+import { LogsUpdate, ParsedLog, TimestampMode, WebviewMessage, WebviewToExtensionMessage } from './types';
 import { formatTimestamp } from './logParser';
 
 export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider {
@@ -71,8 +74,11 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
       async (message: WebviewToExtensionMessage) => {
         switch (message.type) {
           case 'ready':
-            // Send initial config
+            // Send initial config and current logs
             this.sendConfig();
+            if (this.currentLogs.length > 0) {
+              this.handleLogsUpdate({ type: 'full', logs: this.currentLogs });
+            }
             break;
           case 'toggleTimestamps':
             this.cycleTimestampMode();
@@ -93,17 +99,34 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
     );
   }
 
-  public sendLogs(logs: ParsedLog[]) {
-    this.currentLogs = logs;
-    if (this._view) {
-      this._view.webview.postMessage({
-        type: 'logs',
-        logs: logs.map((log) => ({
-          ...log,
-          formattedTimestamp: formatTimestamp(log.timestamp),
-        })),
-      } as WebviewMessage);
+  public handleLogsUpdate(update: LogsUpdate) {
+    if (update.type === 'full') {
+      this.currentLogs = update.logs;
+      if (this._view) {
+        this._view.webview.postMessage({
+          type: 'logs',
+          logs: update.logs.map((log) => ({
+            ...log,
+            formattedTimestamp: formatTimestamp(log.timestamp),
+          })),
+        } as WebviewMessage);
+      }
+    } else {
+      this.currentLogs = [...this.currentLogs, update.log];
+      if (this._view) {
+        this._view.webview.postMessage({
+          type: 'newLog',
+          log: {
+            ...update.log,
+            formattedTimestamp: formatTimestamp(update.log.timestamp),
+          },
+        } as WebviewMessage);
+      }
     }
+  }
+
+  public sendLogs(logs: ParsedLog[]) {
+    this.handleLogsUpdate({ type: 'full', logs });
   }
 
   public clearLogs() {
@@ -294,9 +317,9 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
       return this._flutterSdkPath;
     }
     try {
-      const which = process.platform === 'win32' ? 'where flutter' : 'which flutter';
-      const out = execSync(which, { encoding: 'utf8', timeout: 2000 }).trim();
-      const line = out.split(/[\r\n]/)[0];
+      const [cmd, args] = process.platform === 'win32' ? ['where', ['flutter']] : ['which', ['flutter']];
+      const { stdout } = await execFileAsync(cmd, args, { timeout: 2000, encoding: 'utf8' });
+      const line = stdout.trim().split(/[\r\n]/)[0];
       if (line) {
         let bin = line;
         try {
@@ -476,7 +499,14 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
 						<button class="level-btn active" data-level="error" title="Toggle ERROR logs">E</button>
 					</div>
 					<button class="logic-toggle active" id="logicToggle" title="Toggle filter logic: AND/OR">&&</button>
-					<input type="text" class="filter-input" placeholder="Filter" id="filterInput" title="Filter logs - supports regex">
+					<div class="filter-wrapper">
+						<input type="text" class="filter-input" placeholder="Filter" id="filterInput" title="Filter logs - supports regex">
+						<div class="search-nav" id="searchNav">
+							<span class="search-nav-count" id="searchNavCount"></span>
+							<button class="search-nav-btn" id="searchPrev" title="Previous match (Shift+Enter)">&#x2191;</button>
+							<button class="search-nav-btn" id="searchNext" title="Next match (Enter)">&#x2193;</button>
+						</div>
+					</div>
 				</div>
 				<div class="logs-container" id="logsContainer"></div>
 				<script nonce="${nonce}" src="${scriptUri}"></script>

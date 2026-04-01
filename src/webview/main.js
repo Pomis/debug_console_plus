@@ -15,6 +15,8 @@
   let highlightTags = true; // true = highlight [TAGS], false = plain text
   let filterLogicAnd = true; // true = AND, false = OR
   let localPackageNames = new Set(); // package names that are in the user's workspace (for link styling)
+  let filterDebounceTimer = null;
+  const FILTER_DEBOUNCE_MS = 150;
 
   // Virtual scroll state - variable height
   const DEFAULT_ITEM_HEIGHT = 20;
@@ -263,18 +265,17 @@
 
     switch (message.type) {
       case 'logs':
-        const prevLength = allLogs.length;
         allLogs = message.logs || [];
-
-        // Track launch timestamp from the first log
-        if (allLogs.length > 0 && launchTimestamp === null) {
-          launchTimestamp = allLogs[0].timestamp;
-        }
-
-        if (allLogs.length > prevLength && prevLength > 0) {
-          applyFiltersIncremental(prevLength);
-        } else {
-          applyFilters();
+        launchTimestamp = allLogs.length > 0 ? allLogs[0].timestamp : null;
+        applyFilters();
+        break;
+      case 'newLog':
+        if (message.log) {
+          if (allLogs.length === 0 && launchTimestamp === null) {
+            launchTimestamp = message.log.timestamp;
+          }
+          allLogs.push(message.log);
+          applyFiltersIncremental(allLogs.length - 1);
         }
         break;
       case 'clear':
@@ -341,7 +342,8 @@
     searchQuery = filterInput.value;
     updateSearchRegex();
     updateLogicToggleState();
-    applyFilters();
+    clearTimeout(filterDebounceTimer);
+    filterDebounceTimer = setTimeout(() => applyFilters(), FILTER_DEBOUNCE_MS);
   }
 
   function updateLogicToggleState() {
@@ -568,10 +570,9 @@
     });
   }
 
+  const escapeMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
   function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
+    return text.replace(/[&<>"']/g, (c) => escapeMap[c]);
   }
 
   function highlightSearchMatches(text) {
@@ -607,197 +608,146 @@
     });
   }
 
-  // Find end of balanced JSON object/array starting at start (open is '{' or '['). Respects strings.
-  function findBalancedJsonEnd(html, start) {
-    const open = html[start];
+  // Find end of balanced JSON object/array starting at `start` in raw text.
+  function findBalancedJsonEnd(text, start) {
+    const open = text[start];
     const close = open === '{' ? '}' : ']';
     let depth = 1;
     let i = start + 1;
     let inString = false;
-    let escape = false;
-    let quote = '"';
-    while (i < html.length) {
-      if (escape) {
-        escape = false;
-        i++;
-        continue;
-      }
+    let escaped = false;
+    while (i < text.length) {
+      const c = text[i];
+      if (escaped) { escaped = false; i++; continue; }
       if (inString) {
-        if (html[i] === '\\') {
-          escape = true;
-          i++;
-          continue;
-        }
-        if (html[i] === quote) {
-          inString = false;
-          i++;
-          continue;
-        }
-        i++;
-        continue;
+        if (c === '\\') { escaped = true; i++; continue; }
+        if (c === '"') { inString = false; }
+        i++; continue;
       }
-      const c = html[i];
-      if (c === '"' || c === "'") {
-        inString = true;
-        quote = c;
-        i++;
-        continue;
-      }
-      if (c === open) {
-        depth++;
-        i++;
-        continue;
-      }
-      if (c === close) {
-        depth--;
-        if (depth === 0) return i;
-        i++;
-        continue;
-      }
+      if (c === '"') { inString = true; i++; continue; }
+      if (c === open) { depth++; }
+      else if (c === close) { depth--; if (depth === 0) return i; }
       i++;
     }
     return -1;
   }
 
-  // Tokenize JSON substring and wrap tokens in spans (depth-based bracket colors, key/string/number/punctuation).
-  // Input jsonStr is already HTML-escaped from the pipeline; output raw to avoid double-encoding.
-  function tokenizeAndHighlightJson(jsonStr) {
-    const DEPTH_COUNT = 6;
-    let out = '';
-    let depth = 0;
-    let i = 0;
-    const len = jsonStr.length;
+  // Recursively render a parsed JSON value into syntax-highlighted HTML.
+  const DEPTH_COUNT = 6;
 
-    while (i < len) {
-      const c = jsonStr[i];
-
-      if (c === '{' || c === '[') {
-        const depthClass = depth % DEPTH_COUNT;
-        out += `<span class="json-bracket json-depth-${depthClass}">${c}</span>`;
-        depth++;
-        i++;
-        continue;
-      }
-
-      if (c === '}' || c === ']') {
-        depth--;
-        const depthClass = Math.max(0, depth) % DEPTH_COUNT;
-        out += `<span class="json-bracket json-depth-${depthClass}">${c}</span>`;
-        i++;
-        continue;
-      }
-
-      if (c === ':') {
-        out += `<span class="json-punctuation">${c}</span>`;
-        i++;
-        continue;
-      }
-
-      if (c === ',') {
-        out += `<span class="json-punctuation">${c}</span>`;
-        i++;
-        continue;
-      }
-
-      if (c === '"' || c === "'") {
-        const quote = c;
-        let start = i;
-        i++;
-        while (i < len) {
-          if (jsonStr[i] === '\\') {
-            i += 2;
-            continue;
-          }
-          if (jsonStr[i] === quote) {
-            i++;
-            break;
-          }
-          i++;
-        }
-        const raw = jsonStr.slice(start, i);
-        const isKey = (() => {
-          let j = start - 1;
-          while (j >= 0 && /[\s]/.test(jsonStr[j])) j--;
-          return j >= 0 && (jsonStr[j] === '{' || jsonStr[j] === ',');
-        })();
-        const cls = isKey ? 'json-key' : 'json-string';
-        out += `<span class="${cls}">${raw}</span>`;
-        continue;
-      }
-
-      if (/[\s]/.test(c)) {
-        out += c;
-        i++;
-        continue;
-      }
-
-      // Bare value: consume the entire unquoted token, then classify
-      const bareStart = i;
-      while (i < len && !/[\s{}\[\]:,'"&<>]/.test(jsonStr[i])) i++;
-      if (i > bareStart) {
-        const token = jsonStr.slice(bareStart, i);
-        if (token === 'true' || token === 'false' || token === 'null') {
-          out += `<span class="json-number">${token}</span>`;
-        } else if (/^-?(\d+\.?\d*|\d*\.?\d+)([eE][+-]?\d+)?$/.test(token)) {
-          out += `<span class="json-number">${token}</span>`;
-        } else {
-          out += token;
-        }
-        continue;
-      }
-
-      out += c;
-      i++;
+  function renderJsonValue(value, depth) {
+    if (value === null) {
+      return '<span class="json-null">null</span>';
     }
+    switch (typeof value) {
+      case 'string':
+        return `<span class="json-string">"${escapeHtml(value)}"</span>`;
+      case 'number':
+        return `<span class="json-number">${value}</span>`;
+      case 'boolean':
+        return `<span class="json-bool">${value}</span>`;
+      default:
+        break;
+    }
+    if (Array.isArray(value)) {
+      return renderJsonArray(value, depth);
+    }
+    if (typeof value === 'object') {
+      return renderJsonObject(value, depth);
+    }
+    return escapeHtml(String(value));
+  }
+
+  function renderJsonObject(obj, depth) {
+    const dc = depth % DEPTH_COUNT;
+    const keys = Object.keys(obj);
+    if (keys.length === 0) {
+      return `<span class="json-bracket json-depth-${dc}">{}</span>`;
+    }
+    let out = `<span class="json-bracket json-depth-${dc}">{</span>`;
+    for (let i = 0; i < keys.length; i++) {
+      const key = keys[i];
+      out += `<span class="json-key">"${escapeHtml(key)}"</span>`;
+      out += `<span class="json-punctuation">:</span>`;
+      out += renderJsonValue(obj[key], depth + 1);
+      if (i < keys.length - 1) {
+        out += `<span class="json-punctuation">,</span>`;
+      }
+    }
+    out += `<span class="json-bracket json-depth-${dc}">}</span>`;
     return out;
   }
 
-  function applyJsonHighlighting(html) {
-    if (!highlightTags) return html;
-    let result = '';
-    let i = 0;
-    const len = html.length;
-
-    while (i < len) {
-      if (html[i] === '<') {
-        const close = html.indexOf('>', i);
-        if (close === -1) {
-          result += html[i];
-          i++;
-          continue;
-        }
-        result += html.slice(i, close + 1);
-        i = close + 1;
-        continue;
-      }
-
-      if (html[i] === '{' || html[i] === '[') {
-        const end = findBalancedJsonEnd(html, i);
-        if (end !== -1 && end > i + 1) {
-          const chunk = html.slice(i, end + 1);
-          result += tokenizeAndHighlightJson(chunk);
-          i = end + 1;
-          continue;
-        }
-      }
-
-      result += html[i];
-      i++;
+  function renderJsonArray(arr, depth) {
+    const dc = depth % DEPTH_COUNT;
+    if (arr.length === 0) {
+      return `<span class="json-bracket json-depth-${dc}">[]</span>`;
     }
-    return result;
+    let out = `<span class="json-bracket json-depth-${dc}">[</span>`;
+    for (let i = 0; i < arr.length; i++) {
+      out += renderJsonValue(arr[i], depth + 1);
+      if (i < arr.length - 1) {
+        out += `<span class="json-punctuation">,</span>`;
+      }
+    }
+    out += `<span class="json-bracket json-depth-${dc}">]</span>`;
+    return out;
+  }
+
+  // Extract JSON segments from raw text before HTML escaping.
+  // Returns an array of { type: 'text' | 'json', content: string, parsed?: any }.
+  function splitJsonSegments(raw) {
+    const segments = [];
+    let i = 0;
+    while (i < raw.length) {
+      if (raw[i] === '{' || raw[i] === '[') {
+        const end = findBalancedJsonEnd(raw, i);
+        if (end !== -1 && end > i + 1) {
+          const candidate = raw.slice(i, end + 1);
+          try {
+            const parsed = JSON.parse(candidate);
+            if (typeof parsed === 'object' && parsed !== null) {
+              segments.push({ type: 'json', content: candidate, parsed });
+              i = end + 1;
+              continue;
+            }
+          } catch (_) { /* not valid JSON, treat as text */ }
+        }
+      }
+      const textStart = i;
+      i++;
+      while (i < raw.length && raw[i] !== '{' && raw[i] !== '[') i++;
+      segments.push({ type: 'text', content: raw.slice(textStart, i) });
+    }
+    return segments;
+  }
+
+  function processTextSegment(text) {
+    let html = highlightSearchMatches(text);
+    html = applyTagHighlighting(html);
+    return html;
   }
 
   function processMessageForDisplay(text) {
-    let html = highlightSearchMatches(compactMessage(text));
-    html = applyTagHighlighting(html);
-    html = applyJsonHighlighting(html);
+    const compacted = compactMessage(text);
+
+    // Split into JSON and non-JSON segments on raw text, then render each appropriately
+    const segments = highlightTags ? splitJsonSegments(compacted) : [{ type: 'text', content: compacted }];
+    let html = '';
+    for (const seg of segments) {
+      if (seg.type === 'json') {
+        html += renderJsonValue(seg.parsed, 0);
+      } else {
+        html += processTextSegment(seg.content);
+      }
+    }
+
     // URL links: make http/https URLs clickable (run before file-link regex to avoid conflicts)
-    // Note: match is already HTML-escaped text, so we unescape for the data attribute and keep as-is for display
     html = html.replace(URL_REGEX, (match) => {
       const realUrl = match.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"');
       return `<span class="url-link" data-url="${escapeHtml(realUrl)}">${match}</span>`;
     });
-    // File links: data-scheme is "package" or "dart" (no colon); data-path is the path after the scheme (e.g. log_example/.../file.dart)
+    // File links
     return html.replace(FILE_PATH_REGEX, (match, prefix, path, line, col) => {
       const scheme = prefix ? prefix.replace(':', '') : '';
       const isExternal = scheme === 'dart' || (scheme === 'package' && path.includes('/') && !localPackageNames.has(path.split('/')[0]));

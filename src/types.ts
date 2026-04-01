@@ -16,9 +16,12 @@ export interface ParsedLog {
 
 export type TimestampMode = 'absolute' | 'relative' | 'hidden';
 
+export type LogsUpdate = { type: 'full'; logs: ParsedLog[] } | { type: 'append'; log: ParsedLog };
+
 export interface WebviewMessage {
-  type: 'logs' | 'clear' | 'config' | 'setFilter' | 'copyAll' | 'toggleCompact' | 'toggleTags' | 'packageInfo';
+  type: 'logs' | 'newLog' | 'clear' | 'config' | 'setFilter' | 'copyAll' | 'toggleCompact' | 'toggleTags' | 'packageInfo';
   logs?: ParsedLog[];
+  log?: ParsedLog & { formattedTimestamp?: string };
   config?: {
     timestampMode: TimestampMode;
     autoHideTimestampsWidth: number;
