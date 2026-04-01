@@ -38,47 +38,56 @@
         }
       ]
     },
+    "submenus": [
+      {
+        "id": "debugConsolePlus.more",
+        "label": "...",
+        "icon": "$(ellipsis)"
+      }
+    ],
     "menus": {
       "view/title": [
         {
-          "command": "debugConsolePlus.toggleTags",
+          "command": "debugConsolePlus.toggleTimestamps",
           "when": "view == debugConsolePlusView",
           "group": "navigation@1"
         },
         {
-          "command": "debugConsolePlus.toggleCompact",
+          "command": "debugConsolePlus.copyAll",
           "when": "view == debugConsolePlusView",
           "group": "navigation@2"
         },
         {
-          "command": "debugConsolePlus.toggleTimestamps",
+          "submenu": "debugConsolePlus.more",
           "when": "view == debugConsolePlusView",
           "group": "navigation@3"
         },
         {
-          "command": "debugConsolePlus.copyAll",
+          "command": "debugConsolePlus.clear",
           "when": "view == debugConsolePlusView",
           "group": "navigation@4"
+        }
+      ],
+      "debugConsolePlus.more": [
+        {
+          "command": "debugConsolePlus.toggleTags",
+          "group": "navigation@1"
+        },
+        {
+          "command": "debugConsolePlus.toggleCompact",
+          "group": "navigation@2"
         },
         {
           "command": "debugConsolePlus.setupMcp",
-          "when": "view == debugConsolePlusView",
-          "group": "navigation@5"
+          "group": "navigation@3"
         },
         {
           "command": "debugConsolePlus.saveLogs",
-          "when": "view == debugConsolePlusView",
-          "group": "navigation@6"
+          "group": "navigation@4"
         },
         {
           "command": "debugConsolePlus.loadLogs",
-          "when": "view == debugConsolePlusView",
-          "group": "navigation@7"
-        },
-        {
-          "command": "debugConsolePlus.clear",
-          "when": "view == debugConsolePlusView",
-          "group": "navigation@8"
+          "group": "navigation@5"
         }
       ]
     },
