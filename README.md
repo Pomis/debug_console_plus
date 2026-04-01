@@ -4,13 +4,16 @@
 
 A better debug console for VS Code / Cursor. Filter, search, and let AI query your logs.
 
+**Latest release:** 0.0.7 — see [CHANGELOG.md](CHANGELOG.md) for notes.
+
 ![Debug Console+ demo](recording.gif)
 
 ## Features
 
 - **Level filtering** — toggle debug / info / warn / error with one click
 - **Smart parsing** — detects `[debug]`, `[error]`, etc. tags in log messages automatically
-- **Search** — filter logs by text or regex, combine with AND/OR logic
+- **Search** — filter logs by text or regex, combine with AND/OR logic; with Debug Console+ focused, **Cmd+F** / **Ctrl+F** focuses the filter field
+- **Save / load logs** — export or restore sessions from the **…** (more) menu in the view title bar
 - **Timestamps** — show/hide, auto-hides on narrow panels
 - **Compact** — strip timestamps, Android logcat tags, and box-drawing for clean output
 - **Copy all** — copies filtered logs to clipboard
@@ -21,7 +24,7 @@ A better debug console for VS Code / Cursor. Filter, search, and let AI query yo
 
 AI agents can query your debug logs using the built-in MCP server.
 
-**Setup:** click the plug icon in the Debug Console+ title bar.
+**Setup:** open the **…** (more) menu in the Debug Console+ title bar, then choose **Set Up MCP Server** (plug icon).
 
 Example queries an agent can answer:
 - "Show me only errors"
