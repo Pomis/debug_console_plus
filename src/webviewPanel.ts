@@ -160,6 +160,14 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
     }
   }
 
+  public focusFilter() {
+    if (this._view) {
+      this._view.webview.postMessage({
+        type: 'focusFilter',
+      } as WebviewMessage);
+    }
+  }
+
   private async sendPackageInfo() {
     if (!this._view) return;
     const pkgConfig = await this.getPackageConfig();
@@ -501,10 +509,10 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
 					<button class="logic-toggle active" id="logicToggle" title="Toggle filter logic: AND/OR">&&</button>
 					<div class="filter-wrapper">
 						<input type="text" class="filter-input" placeholder="Filter" id="filterInput" title="Filter logs - supports regex">
-						<div class="search-nav" id="searchNav">
+						<div class="search-nav" id="searchNav" hidden>
 							<span class="search-nav-count" id="searchNavCount"></span>
-							<button class="search-nav-btn" id="searchPrev" title="Previous match (Shift+Enter)">&#x2191;</button>
-							<button class="search-nav-btn" id="searchNext" title="Next match (Enter)">&#x2193;</button>
+							<button type="button" class="level-btn search-nav-btn active" data-level="info" id="searchPrev" title="Previous match (Shift+Enter)">&#x2191;</button>
+							<button type="button" class="level-btn search-nav-btn active" data-level="info" id="searchNext" title="Next match (Enter)">&#x2193;</button>
 						</div>
 					</div>
 				</div>

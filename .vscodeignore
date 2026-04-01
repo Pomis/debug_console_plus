@@ -9,4 +9,5 @@ node_modules/**
 **/*.map
 **/*.ts
 .env
+recording.gif
 

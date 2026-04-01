@@ -62,6 +62,12 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
+  const focusFilterCommand = vscode.commands.registerCommand('debugConsolePlus.focusFilter', () => {
+    if (viewProvider) {
+      viewProvider.focusFilter();
+    }
+  });
+
   const clearCommand = vscode.commands.registerCommand('debugConsolePlus.clear', () => {
     if (tracker) {
       tracker.clearLogs();
@@ -308,7 +314,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  context.subscriptions.push(focusCommand, clearCommand, toggleTimestampsCommand, copyAllCommand, toggleCompactCommand, toggleTagsCommand, diagnoseCommand, setupMcpCommand, saveLogsCommand, loadLogsCommand, tracker);
+  context.subscriptions.push(focusCommand, focusFilterCommand, clearCommand, toggleTimestampsCommand, copyAllCommand, toggleCompactCommand, toggleTagsCommand, diagnoseCommand, setupMcpCommand, saveLogsCommand, loadLogsCommand, tracker);
 
   // Auto-show view when debug session starts
   vscode.debug.onDidStartDebugSession(() => {

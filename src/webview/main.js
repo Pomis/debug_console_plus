@@ -17,6 +17,8 @@
   let localPackageNames = new Set(); // package names that are in the user's workspace (for link styling)
   let filterDebounceTimer = null;
   const FILTER_DEBOUNCE_MS = 150;
+  /** Index into filteredLogs for prev/next navigation; -1 until user navigates with arrows or Enter. */
+  let searchMatchIndex = -1;
 
   // Virtual scroll state - variable height
   const DEFAULT_ITEM_HEIGHT = 20;
@@ -53,6 +55,10 @@
   const levelButtons = document.querySelectorAll('.level-btn');
   const filterInput = document.getElementById('filterInput');
   const logicToggle = document.getElementById('logicToggle');
+  const searchNav = document.getElementById('searchNav');
+  const searchNavCount = document.getElementById('searchNavCount');
+  const searchPrev = document.getElementById('searchPrev');
+  const searchNext = document.getElementById('searchNext');
 
   let scrollContent = null;
   let visibleContent = null;
@@ -69,6 +75,18 @@
       filterInput.addEventListener('input', handleFilterInput);
       filterInput.addEventListener('keydown', (e) => {
         e.stopPropagation();
+        if (e.key === 'Enter') {
+          clearTimeout(filterDebounceTimer);
+          searchQuery = filterInput.value;
+          updateSearchRegex();
+          updateLogicToggleState();
+          applyFilters();
+          if (searchQuery.trim().length > 0 && filteredLogs.length > 0) {
+            e.preventDefault();
+            navigateSearchMatch(e.shiftKey ? -1 : 1);
+          }
+          return;
+        }
         // Handle clipboard shortcuts explicitly — VSCode intercepts them otherwise
         const isMod = e.metaKey || e.ctrlKey;
         if (isMod && e.key === 'c') {
@@ -85,6 +103,13 @@
           e.preventDefault();
         }
       });
+    }
+
+    if (searchPrev) {
+      searchPrev.addEventListener('click', () => navigateSearchMatch(-1));
+    }
+    if (searchNext) {
+      searchNext.addEventListener('click', () => navigateSearchMatch(1));
     }
 
     if (logicToggle) {
@@ -117,10 +142,31 @@
 
     document.addEventListener('click', hideContextMenu);
 
+    document.addEventListener(
+      'keydown',
+      (e) => {
+        const mod = e.metaKey || e.ctrlKey;
+        if (!mod) return;
+        const isFindKey = e.key === 'f' || e.key === 'F' || e.code === 'KeyF';
+        if (!isFindKey) return;
+        e.preventDefault();
+        e.stopPropagation();
+        focusFilterField();
+      },
+      true
+    );
+
     // Initialize toggle button state
     updateLogicToggleState();
+    refreshSearchNav();
 
     vscode.postMessage({ type: 'ready' });
+  }
+
+  function focusFilterField() {
+    if (!filterInput) return;
+    filterInput.focus();
+    filterInput.select();
   }
 
   function setupVirtualScroll() {
@@ -285,6 +331,7 @@
         itemHeights.clear();
         recalculatePositions();
         scheduleRender();
+        refreshSearchNav();
         break;
       case 'config':
         if (message.config) {
@@ -301,6 +348,7 @@
         break;
       case 'setFilter':
         searchQuery = message.filter || '';
+        searchMatchIndex = -1;
         if (filterInput) filterInput.value = searchQuery;
         updateSearchRegex();
         updateLogicToggleState();
@@ -318,6 +366,9 @@
       case 'packageInfo':
         localPackageNames = new Set(message.localPackageNames || []);
         applyFilters();
+        break;
+      case 'focusFilter':
+        focusFilterField();
         break;
     }
   });
@@ -340,6 +391,7 @@
 
   function handleFilterInput() {
     searchQuery = filterInput.value;
+    searchMatchIndex = -1;
     updateSearchRegex();
     updateLogicToggleState();
     clearTimeout(filterDebounceTimer);
@@ -397,6 +449,74 @@
     } else {
       searchRegex = null;
     }
+  }
+
+  function clampSearchMatchIndex() {
+    if (filteredLogs.length === 0) {
+      searchMatchIndex = -1;
+    } else if (searchMatchIndex >= filteredLogs.length) {
+      searchMatchIndex = filteredLogs.length - 1;
+    }
+  }
+
+  function refreshSearchNav() {
+    if (!searchNav) return;
+    const hasSearch = searchQuery.trim().length > 0;
+    searchNav.hidden = !hasSearch;
+    if (!hasSearch) return;
+
+    clampSearchMatchIndex();
+    const total = filteredLogs.length;
+    if (searchNavCount) {
+      if (total === 0) {
+        searchNavCount.textContent = '0';
+      } else if (searchMatchIndex < 0) {
+        searchNavCount.textContent = `- / ${total}`;
+      } else {
+        searchNavCount.textContent = `${searchMatchIndex + 1} / ${total}`;
+      }
+    }
+    if (searchPrev && searchNext) {
+      const disabled = total === 0;
+      searchPrev.disabled = disabled;
+      searchNext.disabled = disabled;
+    }
+  }
+
+  function navigateSearchMatch(delta) {
+    if (!searchQuery.trim() || filteredLogs.length === 0) return;
+    const n = filteredLogs.length;
+    if (searchMatchIndex < 0) {
+      searchMatchIndex = delta > 0 ? 0 : n - 1;
+    } else {
+      searchMatchIndex = (searchMatchIndex + delta + n) % n;
+    }
+    scrollToSearchMatch();
+    refreshSearchNav();
+  }
+
+  function scrollToSearchMatch() {
+    const i = searchMatchIndex;
+    if (i < 0 || i >= filteredLogs.length) return;
+
+    measureItem(i);
+    recalculatePositions();
+
+    const pos = itemPositions[i] || 0;
+    const h = getItemHeight(i);
+    const targetScroll = Math.max(0, pos - containerHeight / 2 + h / 2);
+    logsContainer.scrollTop = targetScroll;
+    scrollTop = targetScroll;
+    shouldAutoScroll = false;
+    scheduleRender(true);
+
+    requestAnimationFrame(() => {
+      const entry = visibleContent?.querySelector(`[data-log-index="${i}"]`);
+      if (entry) {
+        entry.classList.add('highlight');
+        setTimeout(() => entry.classList.remove('highlight'), 600);
+      }
+    });
   }
 
   function updateTimestampVisibility() {
@@ -507,6 +627,8 @@
 
     scheduleRender(true); // Force render on filter change
 
+    refreshSearchNav();
+
     if (wasAtBottom) scrollToBottom();
   }
 
@@ -562,6 +684,7 @@
     }
 
     if (wasAtBottom) scrollToBottom();
+    refreshSearchNav();
   }
 
   function scrollToBottom() {

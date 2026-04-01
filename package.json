@@ -85,7 +85,7 @@
     "commands": [
       {
         "command": "debugConsolePlus.toggleTags",
-        "title": "Toggle [TAG] highlighting",
+        "title": "Toggle syntax highlight",
         "icon": "$(bracket)",
         "category": "Debug Console+"
       },
@@ -116,6 +116,11 @@
       {
         "command": "debugConsolePlus.focus",
         "title": "Focus Debug Console+"
+      },
+      {
+        "command": "debugConsolePlus.focusFilter",
+        "title": "Focus Filter / Search",
+        "category": "Debug Console+"
       },
       {
         "command": "debugConsolePlus.diagnose",
@@ -177,7 +182,15 @@
           "description": "Auto-hide timestamps when panel width is below this (in pixels)"
         }
       }
-    }
+    },
+    "keybindings": [
+      {
+        "command": "debugConsolePlus.focusFilter",
+        "key": "ctrl+f",
+        "mac": "cmd+f",
+        "when": "focusedView == 'debugConsolePlusView'"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

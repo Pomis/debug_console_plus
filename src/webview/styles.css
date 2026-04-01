@@ -139,6 +139,15 @@ body {
   border-color: transparent;
 }
 
+/* Filter row: input + search navigation */
+.filter-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
 /* Filter input */
 .filter-input {
   flex: 1;
@@ -151,6 +160,37 @@ body {
   border-radius: 3px;
   font-size: 11px;
   font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.search-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.search-nav[hidden] {
+  display: none !important;
+}
+
+.search-nav-count {
+  font-size: 11px;
+  font-family: var(--vscode-editor-font-family, monospace);
+  color: var(--vscode-descriptionForeground, #888);
+  white-space: nowrap;
+  padding: 0 2px;
+  min-width: 2.5em;
+  text-align: right;
+}
+
+.level-btn.search-nav-btn {
+  opacity: 1;
+}
+
+.level-btn.search-nav-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .filter-input:focus {
