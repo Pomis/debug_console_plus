@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.0.8] - 2026-04-03
+
+### Added
+
+- Filter modes for text/regex matching: choose **AND**, **OR**, or a dedicated search-within-logs mode from the filter control (including via its context menu).
+
+### Changed
+
+- Search navigation tracks match line indices for more reliable next/previous movement through filtered results.
+
 ## [0.0.7] - 2026-04-01
 
 ### Added
