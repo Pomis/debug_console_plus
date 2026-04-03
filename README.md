@@ -1,24 +1,28 @@
 # Debug Console+
 
 [![Visual Studio Marketplace](https://img.shields.io/visual-studio-marketplace/v/Pomisoft.debug-console-plus?label=VS%20Code%20Marketplace&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=Pomisoft.debug-console-plus)
+[![Open VSX](https://img.shields.io/open-vsx/v/pomisoft/debug-console-plus?label=Open%20VSX&logo=openvsx)](https://open-vsx.org/extension/pomisoft/debug-console-plus)
 
-A better debug console for VS Code / Cursor. Filter, search, and let AI query your logs.
+A better debug console for VS Code / forks. Filter, search, and let AI query your logs.
 
-**Latest release:** 0.0.7 — see [CHANGELOG.md](CHANGELOG.md) for notes.
+**Latest release:** 0.0.8 — see [CHANGELOG.md](CHANGELOG.md) for notes.
 
 ![Debug Console+ demo](recording.gif)
 
 ## Features
 
 - **Level filtering** — toggle debug / info / warn / error with one click
-- **Smart parsing** — detects `[debug]`, `[error]`, etc. tags in log messages automatically
-- **Search** — filter logs by text or regex, combine with AND/OR logic; with Debug Console+ focused, **Cmd+F** / **Ctrl+F** focuses the filter field
+- **Search** — search or filter logs by text or regex, combine with AND/OR logic
 - **Save / load logs** — export or restore sessions from the **…** (more) menu in the view title bar
 - **Timestamps** — show/hide, auto-hides on narrow panels
-- **Compact** — strip timestamps, Android logcat tags, and box-drawing for clean output
-- **Copy all** — copies filtered logs to clipboard
+- **Compact** — strip timestamps, Android logcat tags, and box-drawing for clean output (experimental)
 - **Auto-scroll** — follows new logs, pauses when you scroll up
-- **MCP server** — exposes a `query_debug_logs` tool so AI agents in Cursor can search and filter your logs
+- **Copy & clipboard**
+  - **Copy All Logs** (Command Palette or the copy icon in the view title bar) — copies every line that currently passes your level and search filters (not the unfiltered session). Each line is timestamp (unless timestamps are hidden), level, and the stored message text.
+  - **Copy up to here** / **Copy from here** — right-click any log line in the list. **Copy up to here** copies from the first filtered line through the line you clicked (inclusive). **Copy from here** copies from that line through the last filtered line (inclusive). Hovered ranges highlight so you can see what will be copied. Same filters and clipboard formatting as **Copy All Logs** (note: **Compact** only changes how lines are drawn in the view, not what gets copied).
+
+
+![Debug Console+ screenshot](copy_from_here.gif)
 
 ## MCP Integration
 

@@ -506,7 +506,7 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
 						<button class="level-btn active" data-level="warn" title="Toggle WARN logs">W</button>
 						<button class="level-btn active" data-level="error" title="Toggle ERROR logs">E</button>
 					</div>
-					<button class="logic-toggle active" id="logicToggle" title="Toggle filter logic: AND/OR">&&</button>
+					<button type="button" class="logic-toggle active" id="logicToggle" title="Filter mode (click to cycle, right-click for menu)">&&</button>
 					<div class="filter-wrapper">
 						<input type="text" class="filter-input" placeholder="Filter" id="filterInput" title="Filter logs - supports regex">
 						<div class="search-nav" id="searchNav" hidden>

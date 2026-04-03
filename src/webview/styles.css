@@ -129,14 +129,9 @@ body {
   opacity: 1;
 }
 
-.logic-toggle:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
-
-.logic-toggle:disabled:hover {
-  background-color: transparent;
-  border-color: transparent;
+.logic-toggle-search-icon {
+  display: block;
+  flex-shrink: 0;
 }
 
 /* Filter row: input + search navigation */
@@ -426,6 +421,10 @@ body {
 .context-menu-item:hover {
   background-color: var(--vscode-menu-selectionBackground, #094771);
   color: var(--vscode-menu-selectionForeground, #ffffff);
+}
+
+.context-menu-item--current {
+  font-weight: 600;
 }
 
 .context-menu-separator {

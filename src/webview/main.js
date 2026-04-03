@@ -13,7 +13,8 @@
   let contextMenuTargetIndex = -1;
   let compactMessages = false;
   let highlightTags = true; // true = highlight [TAGS], false = plain text
-  let filterLogicAnd = true; // true = AND, false = OR
+  /** 'search' = levels filter the list, text only for find-in-view; 'and' / 'or' = text participates in filtering. */
+  let filterMode = 'and';
   let localPackageNames = new Set(); // package names that are in the user's workspace (for link styling)
   let filterDebounceTimer = null;
   const FILTER_DEBOUNCE_MS = 150;
@@ -52,6 +53,9 @@
   const BOX_DRAWING_REGEX = /[│├└┌┐┘┴┬┼─║╔╗╚╝╠╣╦╩╬]+\s*/g;
   const TAG_REGEX = /\[([A-Za-z][\w. =-]*)\]/g;
 
+  const SEARCH_TOGGLE_SVG =
+    '<svg class="logic-toggle-search-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><path d="M21 21l-4.3-4.3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+
   // DOM elements
   const logsContainer = document.getElementById('logsContainer');
   const levelButtons = document.querySelectorAll('#levelFilters .level-btn');
@@ -81,7 +85,7 @@
           clearTimeout(filterDebounceTimer);
           searchQuery = filterInput.value;
           updateSearchRegex();
-          updateLogicToggleState();
+          syncFilterModeUi();
           applyFilters();
           recomputeSearchLineIndices();
           if (searchQuery.trim().length > 0 && searchLineIndices.length > 0) {
@@ -116,7 +120,8 @@
     }
 
     if (logicToggle) {
-      logicToggle.addEventListener('click', toggleFilterLogic);
+      logicToggle.addEventListener('click', cycleFilterMode);
+      logicToggle.addEventListener('contextmenu', showFilterModeContextMenu);
     }
 
     logsContainer.addEventListener('scroll', handleScroll);
@@ -160,7 +165,7 @@
     );
 
     // Initialize toggle button state
-    updateLogicToggleState();
+    syncFilterModeUi();
     refreshSearchNav();
 
     vscode.postMessage({ type: 'ready' });
@@ -354,7 +359,7 @@
         searchMatchIndex = -1;
         if (filterInput) filterInput.value = searchQuery;
         updateSearchRegex();
-        updateLogicToggleState();
+        syncFilterModeUi();
         applyFilters();
         break;
       case 'copyAll':
@@ -396,36 +401,82 @@
     searchQuery = filterInput.value;
     searchMatchIndex = -1;
     updateSearchRegex();
-    updateLogicToggleState();
+    syncFilterModeUi();
     clearTimeout(filterDebounceTimer);
     filterDebounceTimer = setTimeout(() => applyFilters(), FILTER_DEBOUNCE_MS);
   }
 
-  function updateLogicToggleState() {
+  function syncFilterModeUi() {
     if (logicToggle) {
-      const hasFilter = searchQuery.trim().length > 0;
-      logicToggle.disabled = !hasFilter;
-      if (hasFilter) {
-        logicToggle.textContent = filterLogicAnd ? '&&' : '||';
-        logicToggle.classList.add('active');
+      logicToggle.classList.add('active');
+      logicToggle.removeAttribute('disabled');
+      if (filterMode === 'search') {
+        logicToggle.innerHTML = SEARCH_TOGGLE_SVG;
+        logicToggle.title =
+          'Search in view: D/I/W/E filter the list; text only highlights and find-next (click to cycle, right-click for menu)';
+      } else if (filterMode === 'and') {
+        logicToggle.textContent = '&&';
+        logicToggle.title = 'Filter (AND): level and text must both match (click to cycle, right-click for menu)';
       } else {
-        logicToggle.classList.remove('active');
+        logicToggle.textContent = '||';
+        logicToggle.title = 'Filter (OR): level or text can match (click to cycle, right-click for menu)';
       }
+    }
+    if (filterInput) {
+      filterInput.placeholder = filterMode === 'search' ? 'Search' : 'Filter';
     }
   }
 
-  function toggleFilterLogic() {
-    // Only allow toggle when filter text is present
-    if (!searchQuery || searchQuery.trim().length === 0) {
-      return;
-    }
-
-    filterLogicAnd = !filterLogicAnd;
-    if (logicToggle) {
-      logicToggle.textContent = filterLogicAnd ? '&&' : '||';
-      logicToggle.classList.add('active');
-    }
+  function setFilterMode(mode) {
+    if (mode !== 'search' && mode !== 'and' && mode !== 'or') return;
+    filterMode = mode;
+    syncFilterModeUi();
     applyFilters();
+  }
+
+  function cycleFilterMode() {
+    if (filterMode === 'and') filterMode = 'or';
+    else if (filterMode === 'or') filterMode = 'search';
+    else filterMode = 'and';
+    syncFilterModeUi();
+    applyFilters();
+  }
+
+  function showFilterModeContextMenu(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    hideContextMenu();
+
+    const menu = document.createElement('div');
+    menu.className = 'context-menu';
+    menu.id = 'filterModeMenu';
+
+    const modes = [
+      { mode: 'search', label: 'Search in view', hint: 'levels filter list; text finds matches' },
+      { mode: 'and', label: 'Filter (AND)', hint: '&&' },
+      { mode: 'or', label: 'Filter (OR)', hint: '||' },
+    ];
+
+    modes.forEach(({ mode, label, hint }) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'context-menu-item' + (filterMode === mode ? ' context-menu-item--current' : '');
+      btn.textContent = label;
+      btn.title = hint;
+      btn.onclick = () => {
+        hideContextMenu();
+        setFilterMode(mode);
+      };
+      menu.appendChild(btn);
+    });
+
+    menu.style.left = `${e.clientX}px`;
+    menu.style.top = `${e.clientY}px`;
+    document.body.appendChild(menu);
+
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) menu.style.left = `${window.innerWidth - rect.width - 5}px`;
+    if (rect.bottom > window.innerHeight) menu.style.top = `${window.innerHeight - rect.height - 5}px`;
   }
 
   function toggleCompact() {
@@ -599,28 +650,24 @@
     return activeLevels.has(log.level);
   }
 
-  function applyFilters() {
-    let filtered;
-    const hasFilter = searchQuery && searchQuery.trim().length > 0;
-
-    if (!hasFilter) {
-      // No filter text: only apply level filter (ignore AND/OR toggle)
-      filtered = allLogs.filter((log) => matchesLevel(log));
-    } else if (filterLogicAnd) {
-      // AND mode: must match level AND search query
-      filtered = allLogs.filter((log) => {
-        const levelMatch = matchesLevel(log);
-        const searchMatch = matchesSearchQuery(log);
-        return levelMatch && searchMatch;
-      });
-    } else {
-      // OR mode: must match level OR search query
-      filtered = allLogs.filter((log) => {
-        const levelMatch = matchesLevel(log);
-        const searchMatch = matchesSearchQuery(log);
-        return levelMatch || searchMatch;
-      });
+  function passLevelAndSearchFilter(log) {
+    const hasText = searchQuery && searchQuery.trim().length > 0;
+    const levelMatch = matchesLevel(log);
+    if (filterMode === 'search') {
+      return levelMatch;
     }
+    if (!hasText) {
+      return levelMatch;
+    }
+    const searchMatch = matchesSearchQuery(log);
+    if (filterMode === 'and') {
+      return levelMatch && searchMatch;
+    }
+    return levelMatch || searchMatch;
+  }
+
+  function applyFilters() {
+    const filtered = allLogs.filter(passLevelAndSearchFilter);
 
     // Decide from current scroll state (avoids race when new logs arrive)
     const wasAtBottom = logsContainer.scrollHeight - logsContainer.scrollTop <= containerHeight + 50;
@@ -654,27 +701,7 @@
     shouldAutoScroll = wasAtBottom;
 
     const newLogs = allLogs.slice(fromIndex);
-    let newFiltered;
-    const hasFilter = searchQuery && searchQuery.trim().length > 0;
-
-    if (!hasFilter) {
-      // No filter text: only apply level filter (ignore AND/OR toggle)
-      newFiltered = newLogs.filter((log) => matchesLevel(log));
-    } else if (filterLogicAnd) {
-      // AND mode: must match level AND search query
-      newFiltered = newLogs.filter((log) => {
-        const levelMatch = matchesLevel(log);
-        const searchMatch = matchesSearchQuery(log);
-        return levelMatch && searchMatch;
-      });
-    } else {
-      // OR mode: must match level OR search query
-      newFiltered = newLogs.filter((log) => {
-        const levelMatch = matchesLevel(log);
-        const searchMatch = matchesSearchQuery(log);
-        return levelMatch || searchMatch;
-      });
-    }
+    const newFiltered = newLogs.filter(passLevelAndSearchFilter);
 
     if (newFiltered.length === 0) return; // No new filtered logs, skip update
 
@@ -1095,6 +1122,7 @@
 
   function hideContextMenu() {
     document.getElementById('contextMenu')?.remove();
+    document.getElementById('filterModeMenu')?.remove();
     contextMenuTargetIndex = -1;
     clearLogHighlights();
   }
