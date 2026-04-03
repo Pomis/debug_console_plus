@@ -22,7 +22,7 @@ A better debug console for VS Code / forks. Filter, search, and let AI query you
   - **Copy up to here** / **Copy from here** — right-click any log line in the list. **Copy up to here** copies from the first filtered line through the line you clicked (inclusive). **Copy from here** copies from that line through the last filtered line (inclusive). Hovered ranges highlight so you can see what will be copied. Same filters and clipboard formatting as **Copy All Logs** (note: **Compact** only changes how lines are drawn in the view, not what gets copied).
 
 
-![Debug Console+ screenshot](copy_from_here.gif)
+![Debug Console+ screenshot](copy_from_here.png)
 
 ## MCP Integration
 
