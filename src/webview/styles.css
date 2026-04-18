@@ -249,16 +249,12 @@ body {
 }
 
 .log-entry.debug {
-  opacity: 0.7;
+  color: var(--vscode-descriptionForeground, #888);
 }
 
 .log-entry.debug .log-timestamp,
 .log-entry.debug .log-level {
   color: var(--vscode-debugIcon-startForeground, #89d185);
-}
-
-.log-entry.info {
-  opacity: 0.9;
 }
 
 .log-entry.info .log-timestamp,

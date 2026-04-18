@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.0.9] - 2026-04-19
+
+### Changed
+
+- Runtime `logs.json` now lives in the extension's per-user global storage (`globalStorageUri`) under a per-workspace subdirectory, instead of in `<workspace>/.debug_console_plus/`. This avoids polluting Git, leaking absolute local paths into shared repos, and runaway log growth in the workspace.
+- **Save Logs** now opens a save dialog so you choose where the export lands (defaults to your home directory) instead of always writing into the workspace.
+- **Load Logs** no longer defaults its file picker to `<workspace>/.debug_console_plus/`.
+- **Set Up MCP Server** now writes the absolute logs path into `.cursor/mcp.json`. **If you were using the MCP integration, re-run "Set Up MCP Server" after upgrading.**
+
+### Added
+
+- **Open Logs Folder** command (in the "..." submenu) that reveals this workspace's logs directory in your OS file manager.
+
+### Migration
+
+- Any existing `<workspace>/.debug_console_plus/` folder is no longer written to. You can safely delete it and remove the entry from `.gitignore` if you added one.
+
 ## [0.0.8] - 2026-04-03
 
 ### Added

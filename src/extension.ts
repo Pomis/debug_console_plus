@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as crypto from 'crypto';
+import * as os from 'os';
 import { DebugConsolePlusViewProvider } from './webviewPanel';
 import { DebugSessionTracker } from './debugSessionTracker';
 import { ParsedLog } from './types';
@@ -8,24 +10,27 @@ import { ParsedLog } from './types';
 let tracker: DebugSessionTracker | null = null;
 let viewProvider: DebugConsolePlusViewProvider | null = null;
 
+/**
+ * Resolve the per-workspace logs directory inside the extension's globalStorage.
+ * Logs no longer live in the workspace, so they don't pollute git or leak local paths.
+ */
+function getLogsDirForWorkspace(context: vscode.ExtensionContext): string {
+  const ws = vscode.workspace.workspaceFolders?.[0];
+  const key = ws
+    ? crypto.createHash('sha256').update(ws.uri.fsPath).digest('hex').slice(0, 16)
+    : 'no-workspace';
+  const dir = path.join(context.globalStorageUri.fsPath, 'workspaces', key);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 export function activate(context: vscode.ExtensionContext) {
   console.log('[Debug Console+] Extension activating...');
 
-  // Get configuration
   const config = vscode.workspace.getConfiguration('debugConsolePlus');
   const maxLogs = config.get<number>('maxLogs', 10000);
 
-  // Determine logs directory path
-  const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-  let logsDir: string | undefined;
-
-  if (workspaceFolder) {
-    logsDir = path.join(workspaceFolder.uri.fsPath, '.debug_console_plus');
-    // Ensure directory exists
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-  }
+  const logsDir = getLogsDirForWorkspace(context);
 
   // Create debug session tracker
   tracker = new DebugSessionTracker(maxLogs, logsDir);
@@ -125,17 +130,16 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    // Get the extension's out directory path (absolute path)
     const extensionPath = context.extensionPath;
     const mcpServerPath = path.join(extensionPath, 'out', 'mcpServer.js');
-    const logsDir = '.debug_console_plus';
+    // Absolute path so the MCP subprocess can find logs regardless of its cwd.
+    const absoluteLogsDir = getLogsDirForWorkspace(context);
 
-    // Use absolute path for the MCP server since it's bundled with the extension
     const mcpConfig = {
       mcpServers: {
         'debug-console-plus': {
           command: 'node',
-          args: [mcpServerPath, '--logs-dir', logsDir],
+          args: [mcpServerPath, '--logs-dir', absoluteLogsDir],
         },
       },
     };
@@ -216,26 +220,26 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    if (!workspaceFolder) {
-      vscode.window.showErrorMessage('No workspace folder open.');
-      return;
-    }
-
-    const logsDir = path.join(workspaceFolder.uri.fsPath, '.debug_console_plus');
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-
     const now = new Date();
     const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}-${String(now.getSeconds()).padStart(2, '0')}`;
     const filename = `debug-logs_${timestamp}.json`;
-    const fileUri = vscode.Uri.file(path.join(logsDir, filename));
+
+    const defaultUri = vscode.Uri.file(path.join(os.homedir(), filename));
+
+    const fileUri = await vscode.window.showSaveDialog({
+      defaultUri,
+      filters: { 'JSON': ['json'] },
+      saveLabel: 'Save Logs',
+    });
+
+    if (!fileUri) {
+      return;
+    }
 
     try {
       const jsonContent = JSON.stringify(logs, null, 2);
       await vscode.workspace.fs.writeFile(fileUri, Buffer.from(jsonContent, 'utf8'));
-      vscode.window.showInformationMessage(`Saved ${logs.length} log${logs.length === 1 ? '' : 's'} to .debug_console_plus/${filename}`);
+      vscode.window.showInformationMessage(`Saved ${logs.length} log${logs.length === 1 ? '' : 's'} to ${fileUri.fsPath}`);
     } catch (error) {
       vscode.window.showErrorMessage(`Failed to save logs: ${error}`);
     }
@@ -247,18 +251,13 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
 
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-    const defaultDir = workspaceFolder
-      ? vscode.Uri.file(path.join(workspaceFolder.uri.fsPath, '.debug_console_plus'))
-      : undefined;
-
     const fileUris = await vscode.window.showOpenDialog({
       filters: {
         'JSON': ['json']
       },
       canSelectMany: false,
       openLabel: 'Load Logs',
-      defaultUri: defaultDir
+      defaultUri: vscode.Uri.file(getLogsDirForWorkspace(context)),
     });
 
     if (!fileUris || fileUris.length === 0) {
@@ -314,7 +313,17 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  context.subscriptions.push(focusCommand, focusFilterCommand, clearCommand, toggleTimestampsCommand, copyAllCommand, toggleCompactCommand, toggleTagsCommand, diagnoseCommand, setupMcpCommand, saveLogsCommand, loadLogsCommand, tracker);
+  const openLogsFolderCommand = vscode.commands.registerCommand('debugConsolePlus.openLogsFolder', async () => {
+    const dir = getLogsDirForWorkspace(context);
+    const uri = vscode.Uri.file(dir);
+    try {
+      await vscode.commands.executeCommand('revealFileInOS', uri);
+    } catch {
+      await vscode.env.openExternal(uri);
+    }
+  });
+
+  context.subscriptions.push(focusCommand, focusFilterCommand, clearCommand, toggleTimestampsCommand, copyAllCommand, toggleCompactCommand, toggleTagsCommand, diagnoseCommand, setupMcpCommand, saveLogsCommand, loadLogsCommand, openLogsFolderCommand, tracker);
 
   // Auto-show view when debug session starts
   vscode.debug.onDidStartDebugSession(() => {

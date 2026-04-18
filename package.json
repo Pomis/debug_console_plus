@@ -3,7 +3,7 @@
   "displayName": "Debug Console+ (Beta)",
   "publisher": "Pomisoft",
   "description": "A better debug console with filtering, search, and MCP integration",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "icon": "icon.png",
   "repository": {
     "type": "git",
@@ -82,12 +82,16 @@
           "group": "navigation@3"
         },
         {
-          "command": "debugConsolePlus.saveLogs",
+          "command": "debugConsolePlus.openLogsFolder",
           "group": "navigation@4"
         },
         {
-          "command": "debugConsolePlus.loadLogs",
+          "command": "debugConsolePlus.saveLogs",
           "group": "navigation@5"
+        },
+        {
+          "command": "debugConsolePlus.loadLogs",
+          "group": "navigation@6"
         }
       ]
     },
@@ -151,6 +155,12 @@
         "command": "debugConsolePlus.loadLogs",
         "title": "Load Logs",
         "icon": "$(folder-opened)",
+        "category": "Debug Console+"
+      },
+      {
+        "command": "debugConsolePlus.openLogsFolder",
+        "title": "Open Logs Folder",
+        "icon": "$(folder)",
         "category": "Debug Console+"
       }
     ],

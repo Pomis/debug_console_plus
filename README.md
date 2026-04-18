@@ -5,7 +5,7 @@
 
 A better debug console for VS Code / forks. Filter, search, and let AI query your logs.
 
-**Latest release:** 0.0.8 — see [CHANGELOG.md](CHANGELOG.md) for notes.
+**Latest release:** 0.0.9 — see [CHANGELOG.md](CHANGELOG.md) for notes.
 
 ![Debug Console+ demo](recording.gif)
 
@@ -28,12 +28,24 @@ A better debug console for VS Code / forks. Filter, search, and let AI query you
 
 AI agents can query your debug logs using the built-in MCP server.
 
-**Setup:** open the **…** (more) menu in the Debug Console+ title bar, then choose **Set Up MCP Server** (plug icon).
+**Setup:** open the **…** (more) menu in the Debug Console+ title bar, then choose **Set Up MCP Server** (plug icon). The setup writes an absolute path to the per-workspace logs directory into `.cursor/mcp.json`, so re-run it if you move workspaces or upgrade from a version older than 0.0.9.
 
 Example queries an agent can answer:
 - "Show me only errors"
 - "Find logs containing 'users' that are errors"
 - "Show recent warnings"
+
+## Where logs are stored
+
+Live logs are written to the extension's per-user **global storage** (outside any workspace), under a per-workspace subdirectory. They are never placed in your project folder, so they don't pollute Git, leak local paths, or grow inside the repo.
+
+Use the **Open Logs Folder** entry in the **…** (more) menu to reveal the current workspace's logs directory in your OS file manager. Typical locations:
+
+- macOS: `~/Library/Application Support/<App>/User/globalStorage/pomisoft.debug-console-plus/workspaces/<hash>/`
+- Linux: `~/.config/<App>/User/globalStorage/pomisoft.debug-console-plus/workspaces/<hash>/`
+- Windows: `%APPDATA%\<App>\User\globalStorage\pomisoft.debug-console-plus\workspaces\<hash>\`
+
+If you upgraded from an older version, you can safely delete any `.debug_console_plus/` folder that was previously created in your workspace (and remove it from `.gitignore`).
 
 ## Install
 
