@@ -41,9 +41,11 @@ Live logs are written to the extension's per-user **global storage** (outside an
 
 Use the **Open Logs Folder** entry in the **…** (more) menu to reveal the current workspace's logs directory in your OS file manager. Typical locations:
 
-- macOS: `~/Library/Application Support/<App>/User/globalStorage/pomisoft.debug-console-plus/workspaces/<hash>/`
-- Linux: `~/.config/<App>/User/globalStorage/pomisoft.debug-console-plus/workspaces/<hash>/`
-- Windows: `%APPDATA%\<App>\User\globalStorage\pomisoft.debug-console-plus\workspaces\<hash>\`
+- macOS: `~/Library/Application Support/<App>/User/globalStorage/pomisoft.debug-console-plus/workspaces/<workspace-name>-<hash>/`
+- Linux: `~/.config/<App>/User/globalStorage/pomisoft.debug-console-plus/workspaces/<workspace-name>-<hash>/`
+- Windows: `%APPDATA%\<App>\User\globalStorage\pomisoft.debug-console-plus\workspaces\<workspace-name>-<hash>\`
+
+The folder name is the workspace's basename plus a short hash (so two projects with the same name still get separate folders).
 
 If you upgraded from an older version, you can safely delete any `.debug_console_plus/` folder that was previously created in your workspace (and remove it from `.gitignore`).
 

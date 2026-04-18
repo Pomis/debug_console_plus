@@ -11,15 +11,54 @@ let tracker: DebugSessionTracker | null = null;
 let viewProvider: DebugConsolePlusViewProvider | null = null;
 
 /**
+ * Slugify a workspace folder name for safe use as a directory name.
+ * Replaces anything outside [A-Za-z0-9._-] with `_` and trims length.
+ */
+function slugifyWorkspaceName(name: string): string {
+  const cleaned = name.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
+  const trimmed = cleaned.slice(0, 50);
+  return trimmed.length > 0 ? trimmed : 'workspace';
+}
+
+function workspaceHash(fsPath: string, length = 8): string {
+  return crypto.createHash('sha256').update(fsPath).digest('hex').slice(0, length);
+}
+
+/**
  * Resolve the per-workspace logs directory inside the extension's globalStorage.
- * Logs no longer live in the workspace, so they don't pollute git or leak local paths.
+ * Folder name is `<workspace-name>-<short-hash>` so it's human-readable but
+ * collision-proof for projects that share a basename. Logs no longer live in the
+ * workspace, so they don't pollute git or leak local paths.
  */
 function getLogsDirForWorkspace(context: vscode.ExtensionContext): string {
+  const workspacesRoot = path.join(context.globalStorageUri.fsPath, 'workspaces');
   const ws = vscode.workspace.workspaceFolders?.[0];
-  const key = ws
-    ? crypto.createHash('sha256').update(ws.uri.fsPath).digest('hex').slice(0, 16)
-    : 'no-workspace';
-  const dir = path.join(context.globalStorageUri.fsPath, 'workspaces', key);
+
+  let folderName: string;
+  if (ws) {
+    const baseName = slugifyWorkspaceName(path.basename(ws.uri.fsPath));
+    const shortHash = workspaceHash(ws.uri.fsPath);
+    folderName = `${baseName}-${shortHash}`;
+
+    // One-shot migration: rename any pre-0.0.9-final hash-only folder
+    // (16-char hex, no name prefix) to the new named layout so MCP/Open Logs
+    // Folder keep working with the same logs.json.
+    try {
+      const legacyHash = workspaceHash(ws.uri.fsPath, 16);
+      const legacyDir = path.join(workspacesRoot, legacyHash);
+      const newDir = path.join(workspacesRoot, folderName);
+      if (fs.existsSync(legacyDir) && !fs.existsSync(newDir)) {
+        fs.mkdirSync(workspacesRoot, { recursive: true });
+        fs.renameSync(legacyDir, newDir);
+      }
+    } catch (err) {
+      console.warn('[Debug Console+] Workspace logs migration skipped:', err);
+    }
+  } else {
+    folderName = 'no-workspace';
+  }
+
+  const dir = path.join(workspacesRoot, folderName);
   fs.mkdirSync(dir, { recursive: true });
   return dir;
 }

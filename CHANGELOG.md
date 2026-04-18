@@ -14,6 +14,7 @@ All notable changes to this project are documented in this file.
 ### Added
 
 - **Open Logs Folder** command (in the "..." submenu) that reveals this workspace's logs directory in your OS file manager.
+- Per-workspace logs folders are now named `<workspace-name>-<short-hash>` (e.g. `debug_console_plus-0ba49f0b`) instead of an opaque hash, so they're recognizable when you browse them.
 
 ### Migration
 
