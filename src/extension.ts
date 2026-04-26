@@ -1,28 +1,14 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import * as crypto from 'crypto';
 import * as os from 'os';
 import { DebugConsolePlusViewProvider } from './webviewPanel';
 import { DebugSessionTracker } from './debugSessionTracker';
 import { ParsedLog } from './types';
+import { getWorkspaceStorageFolderName, workspaceHash } from './workspaceIdentity';
 
 let tracker: DebugSessionTracker | null = null;
 let viewProvider: DebugConsolePlusViewProvider | null = null;
-
-/**
- * Slugify a workspace folder name for safe use as a directory name.
- * Replaces anything outside [A-Za-z0-9._-] with `_` and trims length.
- */
-function slugifyWorkspaceName(name: string): string {
-  const cleaned = name.replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
-  const trimmed = cleaned.slice(0, 50);
-  return trimmed.length > 0 ? trimmed : 'workspace';
-}
-
-function workspaceHash(fsPath: string, length = 8): string {
-  return crypto.createHash('sha256').update(fsPath).digest('hex').slice(0, length);
-}
 
 /**
  * Resolve the per-workspace logs directory inside the extension's globalStorage.
@@ -33,13 +19,9 @@ function workspaceHash(fsPath: string, length = 8): string {
 function getLogsDirForWorkspace(context: vscode.ExtensionContext): string {
   const workspacesRoot = path.join(context.globalStorageUri.fsPath, 'workspaces');
   const ws = vscode.workspace.workspaceFolders?.[0];
+  const folderName = getWorkspaceStorageFolderName();
 
-  let folderName: string;
   if (ws) {
-    const baseName = slugifyWorkspaceName(path.basename(ws.uri.fsPath));
-    const shortHash = workspaceHash(ws.uri.fsPath);
-    folderName = `${baseName}-${shortHash}`;
-
     // One-shot migration: rename any pre-0.0.9-final hash-only folder
     // (16-char hex, no name prefix) to the new named layout so MCP/Open Logs
     // Folder keep working with the same logs.json.
@@ -54,8 +36,6 @@ function getLogsDirForWorkspace(context: vscode.ExtensionContext): string {
     } catch (err) {
       console.warn('[Debug Console+] Workspace logs migration skipped:', err);
     }
-  } else {
-    folderName = 'no-workspace';
   }
 
   const dir = path.join(workspacesRoot, folderName);
@@ -76,7 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
   console.log('[Debug Console+] Debug session tracker created');
 
   // Create webview view provider
-  viewProvider = new DebugConsolePlusViewProvider(context.extensionUri);
+  viewProvider = new DebugConsolePlusViewProvider(context.extensionUri, context.globalState);
   console.log('[Debug Console+] View provider created');
 
   // Register the webview view provider

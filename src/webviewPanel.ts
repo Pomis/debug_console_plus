@@ -7,9 +7,12 @@ import { promisify } from 'util';
 const execFileAsync = promisify(execFile);
 import { LogsUpdate, ParsedLog, TimestampMode, WebviewMessage, WebviewToExtensionMessage } from './types';
 import { formatTimestamp } from './logParser';
+import { getWorkspaceStorageFolderName } from './workspaceIdentity';
 
 export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'debugConsolePlusView';
+
+  private static readonly TIMESTAMP_MODE_STATE_PREFIX = 'debugConsolePlus.timestampMode.';
 
   private _view?: vscode.WebviewView;
   private timestampMode: TimestampMode = 'absolute';
@@ -22,33 +25,52 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
+    private readonly _globalState: vscode.Memento,
   ) {
-    // Invalidate caches when workspace changes
+    // Invalidate caches when workspace changes; reload persisted timestamp mode
     vscode.workspace.onDidChangeWorkspaceFolders(() => {
       this._dartPackageRoots = undefined;
       this._packageConfig = undefined;
+      this.reloadTimestampModeForWorkspace();
+      this.sendConfig();
     });
 
-    // Load initial configuration
     const config = vscode.workspace.getConfiguration('debugConsolePlus');
-    this.timestampMode = config.get<boolean>('showTimestamps', true) ? 'absolute' : 'hidden';
     this.autoHideTimestampsWidth = config.get<number>('autoHideTimestampsWidth', 200);
+    this.reloadTimestampModeForWorkspace();
 
-    // Update config when it changes
     vscode.workspace.onDidChangeConfiguration(
       (e) => {
         if (e.affectsConfiguration('debugConsolePlus')) {
           const config = vscode.workspace.getConfiguration('debugConsolePlus');
           const showTs = config.get<boolean>('showTimestamps', true);
-          // Only reset to absolute/hidden if currently in those modes (don't override relative)
           if (this.timestampMode !== 'relative') {
             this.timestampMode = showTs ? 'absolute' : 'hidden';
+            this.persistTimestampMode();
           }
           this.autoHideTimestampsWidth = config.get<number>('autoHideTimestampsWidth', 200);
           this.sendConfig();
         }
       }
     );
+  }
+
+  private timestampModeStorageKey(): string {
+    return DebugConsolePlusViewProvider.TIMESTAMP_MODE_STATE_PREFIX + getWorkspaceStorageFolderName();
+  }
+
+  private reloadTimestampModeForWorkspace(): void {
+    const saved = this._globalState.get<TimestampMode | undefined>(this.timestampModeStorageKey(), undefined);
+    if (saved === 'absolute' || saved === 'relative' || saved === 'hidden') {
+      this.timestampMode = saved;
+      return;
+    }
+    const config = vscode.workspace.getConfiguration('debugConsolePlus');
+    this.timestampMode = config.get<boolean>('showTimestamps', true) ? 'absolute' : 'hidden';
+  }
+
+  private persistTimestampMode(): void {
+    void this._globalState.update(this.timestampModeStorageKey(), this.timestampMode);
   }
 
   public resolveWebviewView(
@@ -82,6 +104,7 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
             break;
           case 'toggleTimestamps':
             this.cycleTimestampMode();
+            this.persistTimestampMode();
             this.sendConfig();
             break;
           case 'openFile':
@@ -218,6 +241,7 @@ export class DebugConsolePlusViewProvider implements vscode.WebviewViewProvider 
 
   public toggleTimestamps() {
     this.cycleTimestampMode();
+    this.persistTimestampMode();
     this.sendConfig();
   }
 

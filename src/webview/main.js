@@ -132,11 +132,7 @@
       containerWidth = rect.width;
       containerHeight = rect.height;
 
-      if (rect.width < autoHideTimestampsWidth) {
-        document.body.classList.add('hide-timestamps-responsive');
-      } else {
-        document.body.classList.remove('hide-timestamps-responsive');
-      }
+      updateResponsiveTimestampHide();
 
       // Width change invalidates all heights (word wrap changes)
       if (widthChanged) {
@@ -350,6 +346,7 @@
             updateLevelButtons();
           }
           updateTimestampVisibility();
+          updateResponsiveTimestampHide();
           itemHeights.clear();
           applyFilters();
         }
@@ -584,6 +581,14 @@
         setTimeout(() => entry.classList.remove('highlight'), 600);
       }
     });
+  }
+
+  function updateResponsiveTimestampHide() {
+    if (containerWidth < autoHideTimestampsWidth) {
+      document.body.classList.add('hide-timestamps-responsive');
+    } else {
+      document.body.classList.remove('hide-timestamps-responsive');
+    }
   }
 
   function updateTimestampVisibility() {
